@@ -7,7 +7,7 @@
 一个面向 AstrBot 的安全发图与签到插件：Lolicon 优先取图，失败时可用 Pixiv refresh_token 回退，并在 WebUI 管理群排行、成员数值、内容安全和签到数据。
 
 ![AstrBot](https://img.shields.io/badge/AstrBot-plugin-5865f2?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.4.1-22c55e?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.5.0-22c55e?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-OneBot%20%2F%20aiocqhttp-f97316?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3b82f6?style=flat-square)
@@ -33,11 +33,11 @@
 
 ### 签到卡主题
 
-| `00` · 米白 | `01` · 浅蓝 |
+| `04` · 新柳 | `05` · 荷风 |
 | :---: | :---: |
-| ![米白](templates/checkin_themes/default/preview.png) | ![浅蓝](templates/checkin_themes/blue/preview.png) |
-| `02` · 红黑 | `03` · 黄黑 |
-| ![红黑](templates/checkin_themes/red/preview.png) | ![黄黑](templates/checkin_themes/yellow/preview.png) |
+| ![新柳](templates/checkin_themes/spring/preview.png) | ![荷风](templates/checkin_themes/summer/preview.png) |
+| `06` · 丹枫 | `07` · 寒梅 |
+| ![丹枫](templates/checkin_themes/autumn/preview.png) | ![寒梅](templates/checkin_themes/winter/preview.png) |
 
 签到卡支持 `省流量`（960×540）、`清晰`（1248×702）和 `极致`（1728×972）三档。`/签到商店 主题查看 <编号>` 可免费看预览（如 `/签到商店 主题查看 1`），不扣金币、不切换主题。
 
