@@ -65,6 +65,38 @@ CHECKIN_THEMES: dict[str, CheckinTheme] = {
         description="黄黑主题",
         price=1500,
     ),
+    "spring": CheckinTheme(
+        theme_id="spring",
+        code="04",
+        name="新柳",
+        version=1,
+        description="新柳入春的青绿古风主题",
+        price=1500,
+    ),
+    "summer": CheckinTheme(
+        theme_id="summer",
+        code="05",
+        name="荷风",
+        version=1,
+        description="荷风送香的青碧夏日主题",
+        price=1500,
+    ),
+    "autumn": CheckinTheme(
+        theme_id="autumn",
+        code="06",
+        name="丹枫",
+        version=1,
+        description="丹枫入卷的赭金秋日主题",
+        price=1500,
+    ),
+    "winter": CheckinTheme(
+        theme_id="winter",
+        code="07",
+        name="寒梅",
+        version=1,
+        description="疏梅映雪的墨蓝冬日主题",
+        price=1500,
+    ),
 }
 
 

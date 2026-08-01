@@ -47,6 +47,12 @@ plugin_api/
 
 `checkin/shop.py` 中的 `build_checkin_shop_items()` 是商品展示目录的统一注册点，每个商品拥有稳定 `item_id`、分类、指令、名称和价格。新增商品时先在目录中注册展示项，再在 `CheckinShopMixin` 增加购买处理，并将需要原子扣款的数据操作放入 `CheckinStore` 对应 store 模块；入口层只保留 AstrBot 指令装饰器。商品目录和购买行为应分别补充测试。
 
+## 签到卡主题模板
+
+每个主题是 `templates/checkin_themes/<theme_id>/` 下的一个自包含目录，必须提供 `index.html`、`style.css` 和 `preview.png`。`get_checkin_card_template()` 把 CSS 内联进 HTML 的 `/*__CHECKIN_CARD_CSS__*/` 标记，并将字体 base64 填入 `__CHECKIN_CARD_FONT_DATA__`，因此模板不得引用任何外部 URL 或跨目录资源；`test_all_registered_checkin_themes_are_self_contained` 会校验这一点。主题注册在 `checkin/themes.py`，模板内容变化时应同步 `version`，它参与签到卡缓存 key。
+
+四季系列（`spring`/`summer`/`autumn`/`winter`）共用同一套布局 class（`.season-card`、`.season-info`）和信息区块，只有调色板、季节文案和装饰 SVG 不同。正式主题目录只保留运行时需要的 `index.html`、`style.css` 和最终 `preview.png`（冬季另有 README 使用的 `preview_no_artwork.png`）。开发期的构建脚本、预览渲染工具和测试素材只在本地工作区使用，不参与插件运行时和正式提交；改动装饰参数或预览素材后，应在本地重新生成对应正式目录中的预览图。
+
 ## 前端页面
 
 `pages/pluginCenter/` 使用原生 HTML、CSS 和 ES module，集中提供群排行、成员当前数值编辑、内容安全和签到数据管理。前端不持久化业务数据；SQLite 和签到备份仍是后端唯一数据源。成员编辑只更新 `checkin_users`，不回写 `checkin_records` 或 `checkin_group_presence`。
