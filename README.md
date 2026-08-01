@@ -37,7 +37,7 @@
 | :---: | :---: |
 | ![新柳](templates/checkin_themes/spring/preview.png) | ![荷风](templates/checkin_themes/summer/preview.png) |
 | `06` · 丹枫 | `07` · 寒梅 |
-| ![丹枫](templates/checkin_themes/autumn/preview.png) | ![寒梅](templates/checkin_themes/winter/preview_no_artwork.png) |
+| ![丹枫](templates/checkin_themes/autumn/preview.png) | ![寒梅](templates/checkin_themes/winter/preview.png) |
 
 签到卡支持 `省流量`（960×540）、`清晰`（1248×702）和 `极致`（1728×972）三档。`/签到商店 主题查看 <编号>` 可免费看预览（如 `/签到商店 主题查看 1`），不扣金币、不切换主题。
 
