@@ -31,14 +31,35 @@ _FONT_PATH = (
     / "fonts"
     / "LXGWWenKaiLite-GB2312.woff2"
 )
+_SEASON_SHARED_DIR = _PLUGIN_ROOT / "templates" / "checkin_themes" / "_shared"
+_SEASON_ART_MARKER = "<!--__CHECKIN_CARD_ARTWORK__-->"
 
 
 @lru_cache(maxsize=16)
 def get_checkin_card_template(theme_id: str = DEFAULT_CHECKIN_THEME_ID) -> str:
     theme = get_checkin_theme(theme_id)
     template_dir = theme.template_dir(_PLUGIN_ROOT)
-    html = (template_dir / "index.html").read_text(encoding="utf-8")
-    css = (template_dir / "style.css").read_text(encoding="utf-8")
+    shared_html_path = _SEASON_SHARED_DIR / "index.html"
+    shared_css_path = _SEASON_SHARED_DIR / "layout.css"
+    artwork_path = template_dir / "artwork.svg"
+    if shared_html_path.is_file() and shared_css_path.is_file() and artwork_path.is_file():
+        html = shared_html_path.read_text(encoding="utf-8")
+        if _SEASON_ART_MARKER not in html:
+            raise RuntimeError(
+                f"check-in card theme {theme.theme_id} is missing its artwork marker"
+            )
+        html = html.replace(
+            _SEASON_ART_MARKER,
+            artwork_path.read_text(encoding="utf-8").strip(),
+        )
+        css = (
+            shared_css_path.read_text(encoding="utf-8")
+            + "\n\n"
+            + (template_dir / "style.css").read_text(encoding="utf-8")
+        )
+    else:
+        html = (template_dir / "index.html").read_text(encoding="utf-8")
+        css = (template_dir / "style.css").read_text(encoding="utf-8")
     if _CSS_MARKER not in html:
         raise RuntimeError(
             f"check-in card theme {theme.theme_id} is missing its CSS marker"
@@ -305,6 +326,9 @@ def build_checkin_card_data(
             "artwork_credit": escape(_artwork_credit(view_model)),
             "theme_code": escape(theme.code),
             "theme_name": escape(theme.name),
+            "theme_kicker": escape(theme.kicker),
+            "theme_seal": escape(theme.seal),
+            "artwork_placeholder_title": escape(theme.placeholder_title),
             "background_refresh_cost": max(0, int(background_refresh_cost)),
         }
     )
