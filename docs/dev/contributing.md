@@ -76,17 +76,6 @@ ImageDownloader.download() 改为返回 (path, size) 元组，
 修复 #123
 ```
 
-### 不要添加 AI 归属
-
-根据全局开发规则，提交信息中**不要添加**以下内容：
-
-- `Co-Authored-By: Codex <noreply@anthropic.com>`
-- `Co-Authored-By: Claude <...>`
-- `Generated with AI`
-- 或任何类似的 AI 归属声明
-
-提交信息只包含实际改动的描述，不包含工具归属。
-
 ## 改动范围建议
 
 ### 小改动（推荐）
