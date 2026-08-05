@@ -28,6 +28,8 @@
 - [每日签到](#每日签到)
 - [推荐配置](#推荐配置)
 - [更多文档](#更多文档)
+- [Roadmap](#roadmap)
+- [贡献指南](#贡献指南)
 
 ## 界面展示
 
@@ -213,6 +215,34 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 **数据简述：** 发图去重窗口与签到数据保存在插件数据目录；发送用临时图发完即清；签到 JPEG 缓存按天自过期，不会整目录清空数据库、黑名单或备份。
 
 AI 签到问候会向所选 AstrBot 文本模型发送可用昵称、日期、签到统计、关系阶段、奖励、称号和成就；不会把用户 ID 当作昵称发送，昵称不可用时使用“匿名用户”。模型异常、错误角色或输出不合规时使用已保存的本地问候。
+
+## Roadmap
+
+以下是我们关注的方向，欢迎按此提交 issue 或 PR（详情见 [贡献指南](#贡献指南)）。
+
+| 方向 | 说明 | 状态 |
+| --- | --- | --- |
+| 商店经济扩展 | 补签卡、发图券、好感度出口、每日特惠，让金币形成闭环 | 待讨论 |
+| 内容与体验 | 更多签到主题、卡片挂件、自定义称号 | 待讨论 |
+| 稳定与可观测 | 更细的失败日志、插件自检、性能回归 | 持续 |
+| 社区协作 | issue/PR 规范、路由贡献方向 | 已启动 |
+
+> 具体需求、进度与讨论见 [GitHub Issues](https://github.com/shitianyaa/astrbot_plugin_get_px/issues)。
+
+## 贡献指南
+
+欢迎提交 issue 和 PR。贡献前请先阅读 [docs/dev/contributing.md](docs/dev/contributing.md)，了解改动边界、提交规范和文档同步要求。
+
+**提 issue**
+
+- **Bug**：使用 [Bug 模板](https://github.com/shitianyaa/astrbot_plugin_get_px/issues/new?template=bug_report.md)，附上插件版本、AstrBot 版本、复现步骤和脱敏日志。
+- **功能建议**：使用 [Feature 模板](https://github.com/shitianyaa/astrbot_plugin_get_px/issues/new?template=feature_request.md)，说明目标场景和与现有功能的关联。
+
+**提 PR**
+
+- 使用 [PR 模板](https://github.com/shitianyaa/astrbot_plugin_get_px/compare)，说明改动范围、验证方式和兼容性。
+- PR 前请确保本地通过 `pytest` 与语法检查（见 [docs/dev/testing.md](docs/dev/testing.md)）。
+- 代码改动导致文档失真时，请在同一个 PR 中同步更新 README 与 docs。
 
 ## 获取 Pixiv Token
 
