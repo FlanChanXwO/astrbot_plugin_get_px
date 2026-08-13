@@ -1,6 +1,7 @@
 import unittest
 
 from astrbot_plugin_get_px.pixiv.lolicon import LoliconClient
+from astrbot_plugin_get_px.pixiv.constants import AIOCQHTTP_PLATFORM
 from astrbot_plugin_get_px.pixiv.search import SearchMixin
 
 
@@ -103,6 +104,28 @@ class _SourceHarness(SearchMixin):
 
 
 class LoliconClientTest(unittest.IsolatedAsyncioTestCase):
+    def test_forward_threshold_uses_successful_download_count_and_platform(self):
+        self.assertTrue(
+            SearchMixin._should_use_forward(
+                downloaded_count=1, threshold=0, platform_name=AIOCQHTTP_PLATFORM
+            )
+        )
+        self.assertTrue(
+            SearchMixin._should_use_forward(
+                downloaded_count=2, threshold=1, platform_name=AIOCQHTTP_PLATFORM
+            )
+        )
+        self.assertFalse(
+            SearchMixin._should_use_forward(
+                downloaded_count=1, threshold=1, platform_name=AIOCQHTTP_PLATFORM
+            )
+        )
+        self.assertFalse(
+            SearchMixin._should_use_forward(
+                downloaded_count=2, threshold=1, platform_name="qq_official"
+            )
+        )
+
     async def test_request_and_normalization_keep_all_sizes(self):
         client = LoliconClient()
         session = _FakeSession()
