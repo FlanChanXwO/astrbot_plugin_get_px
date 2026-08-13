@@ -6,6 +6,7 @@ from astrbot.api.all import Image, Plain, logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.message_components import Node, Nodes
 
+from .constants import AIOCQHTTP_PLATFORM, MAX_IMAGE_COUNT
 from .downloader import cleanup
 
 
@@ -38,7 +39,7 @@ class SearchMixin:
     def _should_use_forward(
         *, downloaded_count: int, threshold: int, platform_name: str
     ) -> bool:
-        return platform_name == "aiocqhttp" and downloaded_count > threshold
+        return platform_name == AIOCQHTTP_PLATFORM and downloaded_count > threshold
 
     def _ensure_client_or_error(self, event: AstrMessageEvent) -> bool:
         lolicon_client = getattr(self, "lolicon_client", None)
@@ -175,7 +176,7 @@ class SearchMixin:
             return
 
         # 参数解析
-        max_count = self._cfg_int("max_count", 5, 1, 20)
+        max_count = self._cfg_int("max_count", 5, 1, MAX_IMAGE_COUNT)
         try:
             count = max(1, min(int(count_str), max_count)) if count_str else 1
         except (TypeError, ValueError):

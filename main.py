@@ -46,6 +46,7 @@ from .checkin.holiday import HolidayCalendar
 from .checkin.shop import CheckinShopMixin
 from .pixiv import DeliveryMixin, FiltersMixin, SearchMixin
 from .pixiv.client import PixivClient
+from .pixiv.constants import MAX_IMAGE_COUNT
 from .pixiv.downloader import ImageDownloader
 from .pixiv.index import ImageIndexStore
 from .pixiv.lolicon import LoliconClient
@@ -57,7 +58,7 @@ from .plugin_api import PluginWebApi
 
 LOG_PREFIX = "[GetPx]"
 PLUGIN_NAME = "astrbot_plugin_get_px"
-PLUGIN_VERSION = "v3.5.0"
+PLUGIN_VERSION = "v3.5.1"
 WEB_INTERNAL_ERROR_MESSAGE = "服务内部错误，请稍后重试"
 
 AUTO_TRIGGER_PATTERN = r"^/?(来\s*(.*?)(份|个|张|点))(.*?)(福利|色|瑟|涩|塞)?图$"
@@ -681,8 +682,8 @@ class GetPxPlugin(
     def _forward_threshold(self) -> int:
         """Return the merged-forward threshold, accepting the retired bool setting."""
         if "forward_threshold" in self.config:
-            return self._cfg_int("forward_threshold", 1, 0, 20)
-        return 0 if self._cfg_bool("send_as_forward", True) else 20
+            return self._cfg_int("forward_threshold", 1, 0, MAX_IMAGE_COUNT)
+        return 0 if self._cfg_bool("send_as_forward", True) else MAX_IMAGE_COUNT
 
     def _cfg_float(self, key: str, default: float, lo: float, hi: float) -> float:
         try:

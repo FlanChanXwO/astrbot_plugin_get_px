@@ -7,7 +7,7 @@
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `image_quality` | `enum` | `original` | 发图质量：`original`（原图）、`large`（大图）、`medium`（中图）、`square_medium`（缩略图） |
-| `forward_threshold` | `int` | `1` | 成功下载图片数严格大于此值时合并转发；`0` 始终合并转发，`1` 表示超过 1 张才合并转发；范围 `0-20` |
+| `forward_threshold` | `int` | `1` | 仅 aiocqhttp：成功下载图片数严格大于此值时合并转发；`0` 始终合并转发，`1` 表示超过 1 张才合并转发；范围 `0-20` |
 | `dedupe_days` | `int` | `3` | 去重窗口天数（1–30），保留最近 N 个自然日的作品索引 |
 | `allow_manga` | `bool` | `true` | 是否允许漫画（多P作品），关闭时只接受单图 |
 | `lolicon_image_proxy_origins` | `array[string]` | `[]` | Lolicon 图片反代地址列表，最多 5 个有效 origin |
@@ -66,7 +66,7 @@
 - `lolicon_image_proxy_origins` 支持字符串（多行）或数组，最多解析前 5 个有效 origin。
 - `dedupe_days` 影响去重索引保留窗口，改动后会在下次清理时生效。
 - `image_quality` 不影响签到背景，签到背景由 `checkin_card_quality_tier` 独立控制。
-- `forward_threshold` 按成功下载的图片数量判断；非 OneBot 平台或合并转发失败时始终逐条发送。旧配置中的 `send_as_forward` 仅在新字段缺失时兼容：`true` 等价于 `0`，`false` 等价于 `20`。
+- `forward_threshold` 按成功下载的图片数量判断；仅 aiocqhttp 平台会尝试合并转发，其他平台或合并转发失败时始终逐条发送。旧配置中的 `send_as_forward` 仅在新字段缺失时兼容：`true` 等价于 `0`，`false` 等价于 `20`。
 - `downgrade_limit_mb` 为 0 时禁用自动降级，下载失败时直接报错。
 - `rating_policy` 修改后立即生效，但不影响已下载的缓存图片。
 - `pixiv_refresh_token` 留空时 Lolicon 失败会直接报错，不进行 Pixiv 回退。

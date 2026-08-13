@@ -18,6 +18,7 @@ from PIL import Image as PILImage
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from astrbot_plugin_get_px.main import GetPxPlugin, PLUGIN_VERSION  # noqa: E402
+from astrbot_plugin_get_px.pixiv.constants import MAX_IMAGE_COUNT  # noqa: E402
 from astrbot_plugin_get_px.checkin.application import (  # noqa: E402
     CheckinApplicationMixin,
 )
@@ -483,7 +484,7 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plugin._forward_threshold(), 0)
 
         plugin.config = {"send_as_forward": False}
-        self.assertEqual(plugin._forward_threshold(), 20)
+        self.assertEqual(plugin._forward_threshold(), MAX_IMAGE_COUNT)
 
     def test_duplicate_penalty_formatter_is_removed(self):
         source = inspect.getsource(GetPxPlugin)
