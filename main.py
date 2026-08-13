@@ -678,6 +678,12 @@ class GetPxPlugin(
             return default
         return val if lo <= val <= hi else default
 
+    def _forward_threshold(self) -> int:
+        """Return the merged-forward threshold, accepting the retired bool setting."""
+        if "forward_threshold" in self.config:
+            return self._cfg_int("forward_threshold", 1, 0, 20)
+        return 0 if self._cfg_bool("send_as_forward", True) else 20
+
     def _cfg_float(self, key: str, default: float, lo: float, hi: float) -> float:
         try:
             val = float(self.config.get(key, default))

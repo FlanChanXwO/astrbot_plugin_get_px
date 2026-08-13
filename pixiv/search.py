@@ -34,6 +34,12 @@ def _search_source_label(value: object) -> str:
 class SearchMixin:
     """Search and source-fallback flows."""
 
+    @staticmethod
+    def _should_use_forward(
+        *, downloaded_count: int, threshold: int, platform_name: str
+    ) -> bool:
+        return platform_name == "aiocqhttp" and downloaded_count > threshold
+
     def _ensure_client_or_error(self, event: AstrMessageEvent) -> bool:
         lolicon_client = getattr(self, "lolicon_client", None)
         if lolicon_client and lolicon_client.available:
@@ -261,9 +267,6 @@ class SearchMixin:
                 str(illust.get("id") or "") for illust in chosen if illust.get("id")
             }
 
-        # 判断发送模式
-        send_as_forward = self._cfg_bool("send_as_forward", True)
-
         # 下载所有图片
         downloaded: list[tuple[dict, str, str, int]] = []
         temp_paths: list[str] = []
@@ -304,9 +307,13 @@ class SearchMixin:
                 yield event.plain_result("😢 所有图片均下载失败，请稍后再试")
                 return
 
-            # 非 OneBot 平台不支持合并转发，自动降级
-            is_onebot = event.get_platform_name() == "aiocqhttp"
-            use_forward = send_as_forward and is_onebot
+            # 非 OneBot 平台不支持合并转发，自动降级。
+            forward_threshold = self._forward_threshold()
+            use_forward = self._should_use_forward(
+                downloaded_count=len(downloaded),
+                threshold=forward_threshold,
+                platform_name=event.get_platform_name(),
+            )
 
             if use_forward:
                 # 合并转发模式：所有图片打包成一条聊天记录

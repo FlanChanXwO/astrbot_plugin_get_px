@@ -161,7 +161,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | --- | --- |
 | `pixiv_refresh_token` | 可选，作为 Lolicon 失败后的 Pixiv 回退 |
 | `image_quality` | 省流量用 `large`，优先原图用 `original` |
-| `send_as_forward` | QQ 场景建议开启 |
+| `forward_threshold` | `0` 始终合并转发；`1` 表示超过 1 张图才合并转发 |
 | `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致` |
 | `dedupe_days` | 默认 `1`；需要跨日避免重复时可设为 `2–7`，`0` 为关闭 |
 | `lolicon_image_proxy_origins` | 图片地址无法访问时再配置；每行一个 http(s) origin |
@@ -182,7 +182,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | `request_timeout` | 单张图片下载超时，单位秒 | `30` |
 | `image_quality` | 图片质量：`original`、`large`、`medium` | `original` |
 | `auto_downgrade_original_mb` | 原图超过该大小时自动降级，单位 MiB；`0` 为禁用 | `3.0` |
-| `send_as_forward` | 多图以合并转发发送；非 QQ 平台不支持时自动逐条发送 | `true` |
+| `forward_threshold` | 成功下载图片数严格大于此值时合并转发；`0` 始终合并转发，`1` 表示超过 1 张才合并转发；非 QQ 平台自动逐条发送 | `1` |
 | `auto_trigger_enabled` | 自然语言自动触发 | `false` |
 | `checkin_enabled` | 签到开关 | `true` |
 | `checkin_bot_name` | 签到卡片中的 bot 角色名 | `neko` |

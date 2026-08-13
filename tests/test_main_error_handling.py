@@ -471,6 +471,20 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
             plugin._friendly_send_error(asyncio.TimeoutError()),
         )
 
+    def test_forward_threshold_uses_new_setting_or_legacy_bool_fallback(self):
+        plugin = object.__new__(GetPxPlugin)
+        plugin.config = {"forward_threshold": 0, "send_as_forward": False}
+        self.assertEqual(plugin._forward_threshold(), 0)
+
+        plugin.config = {"forward_threshold": 1}
+        self.assertEqual(plugin._forward_threshold(), 1)
+
+        plugin.config = {"send_as_forward": True}
+        self.assertEqual(plugin._forward_threshold(), 0)
+
+        plugin.config = {"send_as_forward": False}
+        self.assertEqual(plugin._forward_threshold(), 20)
+
     def test_duplicate_penalty_formatter_is_removed(self):
         source = inspect.getsource(GetPxPlugin)
 

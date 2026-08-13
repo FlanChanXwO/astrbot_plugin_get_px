@@ -77,11 +77,12 @@
     "slider": {"min": 0, "max": 100, "step": 0.5},
     "hint": "当实际下载到的原图超过该大小时，自动改用 large/medium 等低质量图片。设为 0 可禁用自动降级。"
   },
-  "send_as_forward": {
-    "description": "合并转发发送",
-    "type": "bool",
-    "default": true,
-    "hint": "开启后多张图片以合并转发消息（聊天记录）形式发送，便于集中浏览。非 QQ 平台不支持合并转发时会自动拆分成单条消息发送；关闭则始终逐条发送。"
+  "forward_threshold": {
+    "description": "合并转发阈值",
+    "type": "int",
+    "default": 1,
+    "slider": {"min": 0, "max": 20, "step": 1},
+    "hint": "成功下载的图片数量严格大于此值时以合并转发发送。设为 0 时始终合并转发；设为 1 时超过 1 张才合并转发。非 QQ 平台不支持合并转发时会自动逐条发送。"
   },
   "auto_trigger_enabled": {
     "description": "自然语言自动触发",
