@@ -13,6 +13,7 @@
 | `lolicon_image_proxy_origins` | `array[string]` | `[]` | Lolicon 图片反代地址列表，最多 5 个有效 origin |
 | `refresh_cost` | `int` | `100` | 签到背景刷新金币价格（0–1000） |
 | `downgrade_limit_mb` | `float` | `20.0` | 原图自动降级阈值（MB），超过此大小时自动降低质量 |
+| `p_coin_cost` | `int` | `20` | `/p`（以及自然语言触发）成功发图每张消耗的金币；范围 `0-500`，`0` 表示免费。金币不足时仅提醒，图片下载或发送失败不扣币 |
 
 ## 内容安全配置
 
