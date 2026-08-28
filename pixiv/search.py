@@ -41,6 +41,27 @@ class SearchMixin:
     ) -> bool:
         return platform_name == AIOCQHTTP_PLATFORM and downloaded_count > threshold
 
+    def _p_unit_cost(self) -> int:
+        return self._cfg_int("p_coin_cost", 20, 0, 500)
+
+    def _p_charging_active(self) -> bool:
+        return (
+            self._p_unit_cost() > 0
+            and self._cfg_bool("checkin_enabled", True)
+            and getattr(self, "checkin_store", None) is not None
+        )
+
+    async def _p_balance_error(self, user_id: str, count: int) -> str:
+        """返回余额不足提示；余额充足时返回空串。"""
+        cost = self._p_unit_cost()
+        if not user_id or cost <= 0 or count <= 0:
+            return ""
+        profile = await self.checkin_store.get_profile(user_id)
+        total = cost * count
+        if profile.coins < total:
+            return f"金币不足，需要 {total}，当前只有 {profile.coins}。"
+        return ""
+
     def _ensure_client_or_error(self, event: AstrMessageEvent) -> bool:
         lolicon_client = getattr(self, "lolicon_client", None)
         if lolicon_client and lolicon_client.available:
@@ -181,6 +202,14 @@ class SearchMixin:
             count = max(1, min(int(count_str), max_count)) if count_str else 1
         except (TypeError, ValueError):
             count = 1
+
+        # 金币预检：请求张数 × 单价，余额不足直接提醒并终止。
+        if self._p_charging_active():
+            sender_id = str(event.get_sender_id() or "")
+            balance_error = await self._p_balance_error(sender_id, count)
+            if balance_error:
+                yield event.plain_result(balance_error)
+                return
 
         try:
             if tag and await self._blocked_query_term(tag):
@@ -502,6 +531,22 @@ class SearchMixin:
                                 except Exception:
                                     pass
         finally:
+            if self._p_charging_active() and sent_illust_ids:
+                total_cost = self._p_unit_cost() * len(sent_illust_ids)
+                try:
+                    await self.checkin_store.spend_coins(
+                        user_id=str(event.get_sender_id() or ""),
+                        cost=total_cost,
+                    )
+                    logger.info(
+                        f"{LOG_PREFIX} /p 金币结算: "
+                        f"sent_count={len(sent_illust_ids)} cost={total_cost}"
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"{LOG_PREFIX} /p 金币结算失败，本次不扣费: "
+                        f"error_type={type(exc).__name__}"
+                    )
             for p in temp_paths:
                 cleanup(p)
             if pending_illust_ids and self.image_index is not None:

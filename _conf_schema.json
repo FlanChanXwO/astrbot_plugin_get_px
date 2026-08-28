@@ -37,6 +37,13 @@
     "slider": {"min": 1, "max": 20, "step": 1},
     "hint": "用户单次指令最多发送几张图。"
   },
+  "p_coin_cost": {
+    "description": "/p 指令发图金币单价",
+    "type": "int",
+    "default": 20,
+    "slider": {"min": 0, "max": 500, "step": 5},
+    "hint": "使用 /p（或自然语言触发）成功发送每张图所消耗的金币；设为 0 表示免费。金币不足时仅提醒，图片下载或发送失败不扣币。"
+  },
   "dedupe_days": {
     "description": "图片去重天数",
     "type": "int",

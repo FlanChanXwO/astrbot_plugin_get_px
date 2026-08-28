@@ -72,6 +72,7 @@ def test_p_charging_active_requires_checkin_store() -> None:
     assert mixin._p_charging_active() is False  # checkin_store 为 None
 
 
+@pytest.mark.asyncio
 async def test_p_balance_error_reports_shortfall() -> None:
     mixin = _MinSearch()
     mixin.checkin_store = AsyncMock()
