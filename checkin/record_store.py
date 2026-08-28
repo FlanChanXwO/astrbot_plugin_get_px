@@ -19,6 +19,7 @@ from .models import (
     CheckinProfile,
     CheckinRecord,
     CheckinResult,
+    CoinSpendResult,
 )
 from .rules import (
     daily_base_reward as _daily_base_reward,
@@ -265,6 +266,53 @@ class RecordStoreMixin:
                 self.today_key(),
                 self.now_iso(),
             )
+
+    async def spend_coins(self, *, user_id: str, cost: int) -> CoinSpendResult:
+        if isinstance(cost, bool) or not isinstance(cost, int) or cost < 0:
+            raise ValueError("coin cost must be a non-negative integer")
+        async with self._lock:
+            return await asyncio.to_thread(
+                self._spend_coins_sync, str(user_id or ""), int(cost)
+            )
+
+    def _spend_coins_sync(self, user_id: str, cost: int) -> CoinSpendResult:
+        if not user_id:
+            raise ValueError("user_id is required")
+        now = self.now_iso()
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                profile_row = conn.execute(
+                    "SELECT * FROM checkin_users WHERE user_id = ?",
+                    (user_id,),
+                ).fetchone()
+                profile = (
+                    self._row_to_profile(profile_row)
+                    if profile_row is not None
+                    else self._get_or_create_profile_sync(user_id)
+                )
+                if profile.coins < cost:
+                    conn.commit()
+                    return CoinSpendResult(
+                        success=False,
+                        profile=profile,
+                        cost=cost,
+                        message=f"金币不足，需要 {cost}，当前只有 {profile.coins}。",
+                    )
+                remaining = profile.coins - cost
+                conn.execute(
+                    "UPDATE checkin_users SET coins = ?, updated_at = ? "
+                    "WHERE user_id = ?",
+                    (remaining, now, user_id),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        updated = self._get_or_create_profile_sync(user_id)
+        return CoinSpendResult(
+            success=True, profile=updated, cost=cost, message="扣费成功"
+        )
 
     async def update_record_content(
         self,
