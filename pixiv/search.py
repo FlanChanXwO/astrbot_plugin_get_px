@@ -553,11 +553,34 @@ class SearchMixin:
                             f"sent_count={len(sent_illust_ids)} cost={total_cost} "
                             f"result_message={result.message}"
                         )
+                        try:
+                            await event.send(
+                                event.plain_result(
+                                    f"⚠️ 金币结算未完成：{result.message}"
+                                )
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                f"{LOG_PREFIX} 发送金币结算警告失败: "
+                                f"error_type={type(exc).__name__}"
+                            )
                     else:
                         logger.info(
                             f"{LOG_PREFIX} /p 金币结算: "
                             f"sent_count={len(sent_illust_ids)} cost={total_cost}"
                         )
+                        try:
+                            await event.send(
+                                event.plain_result(
+                                    f"💰 本次发图消耗 {total_cost} 金币"
+                                    f"（{len(sent_illust_ids)} 张），余额 {result.profile.coins}。"
+                                )
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                f"{LOG_PREFIX} 发送金币结算提醒失败: "
+                                f"error_type={type(exc).__name__}"
+                            )
                 except Exception as exc:
                     logger.warning(
                         f"{LOG_PREFIX} /p 金币结算失败，本次不扣费: "

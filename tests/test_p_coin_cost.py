@@ -9,7 +9,11 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from astrbot_plugin_get_px.checkin import CheckinStore, CoinSpendResult
+from astrbot_plugin_get_px.checkin import (
+    CheckinProfile,
+    CheckinStore,
+    CoinSpendResult,
+)
 from astrbot_plugin_get_px.pixiv.search import SearchMixin
 
 
@@ -179,14 +183,52 @@ class _FlowEvent:
         return None
 
 
-def _settle_store():
+def _settle_store(fail_settle: bool = False):
     store = AsyncMock()
-    profile = AsyncMock()
-    profile.coins = 1000
-    store.get_profile = AsyncMock(return_value=profile)
-    result = type("SpendResult", (), {"success": True, "message": "扣费成功"})()
-    store.spend_coins = AsyncMock(return_value=result)
-    return store
+    collect = {"coins": 1000}
+
+    def _profile():
+        return CheckinProfile(
+            user_id="10001",
+            coins=collect["coins"],
+            affection=0.0,
+            total_days=10,
+            streak_days=2,
+            last_checkin_date="2026-08-28",
+            boost_start_date="",
+            boost_until_date="",
+            repeat_penalty_date="",
+            repeat_penalty_total=0.0,
+            created_at="2026-08-01T00:00:00+08:00",
+            updated_at="2026-08-28T00:00:00+08:00",
+        )
+
+    async def spend(*args, **kwargs):
+        if fail_settle:
+            return CoinSpendResult(
+                success=False,
+                profile=_profile(),
+                cost=int(kwargs["cost"]),
+                message="金币不足，需要 40，当前只有 10。",
+            )
+        collect["coins"] -= int(kwargs["cost"])
+        return CoinSpendResult(
+            success=True, profile=_profile(), cost=int(kwargs["cost"]), message="扣费成功"
+        )
+
+    store.get_profile = AsyncMock(side_effect=lambda user: _profile())
+    store.spend_coins = AsyncMock(side_effect=spend)
+    return store, collect
+
+
+def _sent_texts(event) -> list[str]:
+    texts = []
+    for sent in event.sent:
+        if isinstance(sent, str):
+            texts.append(sent)
+        else:
+            texts.extend(str(item) for item in sent)
+    return texts
 
 
 def _illust(ident):
@@ -203,7 +245,7 @@ async def _run_search(harness, event, count_str):
 @pytest.mark.asyncio
 async def test_search_settlement_charges_exactly_sent_count() -> None:
     harness = _SearchFlowHarness(illusts=[_illust(1), _illust(2), _illust(3)])
-    harness.checkin_store = _settle_store()
+    harness.checkin_store, balance = _settle_store()
     downloader = AsyncMock()
     downloader.download_for_send = AsyncMock(
         side_effect=[
@@ -220,12 +262,34 @@ async def test_search_settlement_charges_exactly_sent_count() -> None:
     args, kwargs = harness.checkin_store.spend_coins.await_args
     assert kwargs["cost"] == 40  # 2 张成功 × 单价 20
     assert kwargs["user_id"] == "10001"
+    assert balance["coins"] == 960  # 1000 - 40 真实递减
+    # 结算成功后必须向用户发出扣费提醒
+    texts = _sent_texts(event)
+    assert any("消耗 40 金币" in text for text in texts)
+    assert any("余额 960" in text for text in texts)
+
+
+@pytest.mark.asyncio
+async def test_search_settlement_warns_user_when_charge_fails() -> None:
+    """TOCTOU：结算时余额不足（success=False）必须向用户发出警告且不扣钱。"""
+    harness = _SearchFlowHarness(illusts=[_illust(1)])
+    harness.checkin_store, balance = _settle_store(fail_settle=True)
+    downloader = AsyncMock()
+    downloader.download_for_send = AsyncMock(return_value=("p1.jpg", "medium", 1024))
+    harness.downloader = downloader
+    event = _FlowEvent()
+    await _run_search(harness, event, "1")
+
+    harness.checkin_store.spend_coins.assert_awaited_once()
+    assert balance["coins"] == 1000  # 结算失败，余额未被扣减
+    texts = _sent_texts(event)
+    assert any("⚠️" in text and "金币结算未完成" in text for text in texts)
 
 
 @pytest.mark.asyncio
 async def test_search_settlement_skips_charge_when_nothing_sent() -> None:
     harness = _SearchFlowHarness(illusts=[_illust(1)])
-    harness.checkin_store = _settle_store()
+    harness.checkin_store, _balance = _settle_store()
     downloader = AsyncMock()
     downloader.download_for_send = AsyncMock(side_effect=RuntimeError("网络中断"))
     harness.downloader = downloader
@@ -241,7 +305,7 @@ async def test_search_forward_branch_settles_downloaded_count() -> None:
     harness = _SearchFlowHarness(
         platform="aiocqhttp", illusts=[_illust(1), _illust(2)]
     )
-    harness.checkin_store = _settle_store()
+    harness.checkin_store, _balance = _settle_store()
     downloader = AsyncMock()
     downloader.download_for_send = AsyncMock(
         return_value=("p.jpg", "medium", 1024)
