@@ -282,17 +282,34 @@ class RecordStoreMixin:
         with closing(self._connect()) as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                # 新用户在同一连接上创建 0 币档案，避免另开连接触发写锁死锁。
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO checkin_users (
+                        user_id, coins, affection, total_days, streak_days,
+                        last_checkin_date, boost_start_date, boost_until_date,
+                        repeat_penalty_date, repeat_penalty_total,
+                        created_at, updated_at
+                    )
+                    VALUES (?, 0, 0, 0, 0, '', '', '', '', 0, ?, ?)
+                    """,
+                    (user_id, now, now),
+                )
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO checkin_user_themes
+                        (user_id, theme_id, price_paid, acquired_at)
+                    VALUES (?, 'default', 0, ?)
+                    """,
+                    (user_id, now),
+                )
                 profile_row = conn.execute(
                     "SELECT * FROM checkin_users WHERE user_id = ?",
                     (user_id,),
                 ).fetchone()
-                profile = (
-                    self._row_to_profile(profile_row)
-                    if profile_row is not None
-                    else self._get_or_create_profile_sync(user_id)
-                )
+                profile = self._row_to_profile(profile_row)
                 if profile.coins < cost:
-                    conn.commit()
+                    conn.commit()  # 空事务提交以释放写锁
                     return CoinSpendResult(
                         success=False,
                         profile=profile,

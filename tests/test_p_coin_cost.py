@@ -83,3 +83,173 @@ async def test_p_balance_error_reports_shortfall() -> None:
     assert "金币不足，需要 60，当前只有 25。" in error
     ok = await mixin._p_balance_error("10001", 1)
     assert ok == ""
+
+
+@pytest.mark.asyncio
+async def test_spend_coins_unknown_user_creates_profile_and_declines_quickly() -> None:
+    """新用户分支必须在同一连接上建档案，不能触发写锁死锁。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        store = CheckinStore(tmp)
+        result = await store.spend_coins(user_id="90001", cost=30)
+        assert result.success is False
+        assert "金币不足，需要 30，当前只有 0。" in result.message
+        profile = await store.get_profile("90001")
+        assert profile.coins == 0
+
+
+class _SearchFlowHarness(SearchMixin):
+    """轻量集成桩：驱动 _handle_search 走到结算，只打桩网络与事件。"""
+
+    def __init__(self, platform="qq_official", illusts=None):
+        self.config = {"p_coin_cost": 20, "checkin_enabled": True}
+        self.platform = platform
+        self.illusts = illusts or []
+        self.image_index = None
+        self.checkin_store = None
+        self.downloader = None
+        self._dedupe_days_cfg = 0
+        self.download_results = []
+        self.sent_chains = []
+
+    def _cfg_int(self, key, default, lo, hi):
+        if key == "dedupe_days":
+            return self._dedupe_days_cfg
+        return int(self.config.get(key, default))
+
+    def _cfg_float(self, key, default, lo, hi):
+        return float(self.config.get(key, default))
+
+    def _cfg_str(self, key, default=""):
+        return str(self.config.get(key, default))
+
+    def _cfg_bool(self, key, default):
+        return bool(self.config.get(key, default))
+
+    def _check_rate_limit(self, user_id):
+        return 0
+
+    def _forward_threshold(self):
+        return 0
+
+    async def _blocked_query_term(self, query):
+        return ""
+
+    def _filter_manga(self, illusts):
+        return illusts
+
+    async def _filter_blacklisted_illusts(self, illusts):
+        return illusts
+
+    async def _pick_illusts(
+        self, event, illusts, pick_count, *, source_key, dedupe_enabled, raw_count
+    ):
+        return illusts[:pick_count]
+
+    async def _fetch_source_candidates(
+        self, event, tag, *, count=20, offset=0, aspect_ratio="", use_page_cursor=True
+    ):
+        return self.illusts, len(self.illusts), "lolicon:random"
+
+
+class _FlowEvent:
+    def __init__(self, platform="qq_official"):
+        self.platform = platform
+        self.sent = []
+
+    def get_sender_id(self):
+        return "10001"
+
+    def get_group_id(self):
+        return "group:1"
+
+    def get_platform_name(self):
+        return self.platform
+
+    def get_self_id(self):
+        return "self-bot"
+
+    def plain_result(self, text):
+        return f"plain:{text}"
+
+    def chain_result(self, chain):
+        return list(chain)
+
+    async def send(self, chain):
+        self.sent.append(chain)
+        return None
+
+
+def _settle_store():
+    store = AsyncMock()
+    profile = AsyncMock()
+    profile.coins = 1000
+    store.get_profile = AsyncMock(return_value=profile)
+    result = type("SpendResult", (), {"success": True, "message": "扣费成功"})()
+    store.spend_coins = AsyncMock(return_value=result)
+    return store
+
+
+def _illust(ident):
+    return {"id": str(ident), "title": f"t{ident}", "x_restrict": 0, "tags": []}
+
+
+async def _run_search(harness, event, count_str):
+    outputs = []
+    async for item in harness._handle_search(event, "", count_str):
+        outputs.append(item)
+    return outputs
+
+
+@pytest.mark.asyncio
+async def test_search_settlement_charges_exactly_sent_count() -> None:
+    harness = _SearchFlowHarness(illusts=[_illust(1), _illust(2), _illust(3)])
+    harness.checkin_store = _settle_store()
+    downloader = AsyncMock()
+    downloader.download_for_send = AsyncMock(
+        side_effect=[
+            ("p1.jpg", "medium", 1024),
+            RuntimeError("网络中断"),
+            ("p3.jpg", "medium", 1024),
+        ]
+    )
+    harness.downloader = downloader
+    event = _FlowEvent()
+    await _run_search(harness, event, "3")
+
+    harness.checkin_store.spend_coins.assert_awaited_once()
+    args, kwargs = harness.checkin_store.spend_coins.await_args
+    assert kwargs["cost"] == 40  # 2 张成功 × 单价 20
+    assert kwargs["user_id"] == "10001"
+
+
+@pytest.mark.asyncio
+async def test_search_settlement_skips_charge_when_nothing_sent() -> None:
+    harness = _SearchFlowHarness(illusts=[_illust(1)])
+    harness.checkin_store = _settle_store()
+    downloader = AsyncMock()
+    downloader.download_for_send = AsyncMock(side_effect=RuntimeError("网络中断"))
+    harness.downloader = downloader
+    event = _FlowEvent()
+    await _run_search(harness, event, "1")
+
+    harness.checkin_store.spend_coins.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_search_forward_branch_settles_downloaded_count() -> None:
+    """合并转发成功路径同样按实际发送数一次性结算。"""
+    harness = _SearchFlowHarness(
+        platform="aiocqhttp", illusts=[_illust(1), _illust(2)]
+    )
+    harness.checkin_store = _settle_store()
+    downloader = AsyncMock()
+    downloader.download_for_send = AsyncMock(
+        return_value=("p.jpg", "medium", 1024)
+    )
+    harness.downloader = downloader
+    event = _FlowEvent(platform="aiocqhttp")
+    await _run_search(harness, event, "2")
+
+    harness.checkin_store.spend_coins.assert_awaited_once()
+    args, kwargs = harness.checkin_store.spend_coins.await_args
+    assert kwargs["cost"] == 40
