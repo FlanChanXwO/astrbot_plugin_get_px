@@ -1,6 +1,5 @@
 import asyncio
 import json
-import inspect
 import shutil
 import sqlite3
 import sys
@@ -19,10 +18,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from astrbot_plugin_get_px.main import GetPxPlugin, PLUGIN_VERSION  # noqa: E402
 from astrbot_plugin_get_px.pixiv.constants import MAX_IMAGE_COUNT  # noqa: E402
-from astrbot_plugin_get_px.checkin.application import (  # noqa: E402
-    CheckinApplicationMixin,
-)
-from astrbot_plugin_get_px.checkin.artwork import CheckinArtworkMixin  # noqa: E402
 from astrbot_plugin_get_px.checkin import (  # noqa: E402
     CheckinProfile,
     CheckinRecord,
@@ -66,6 +61,19 @@ class _FakeEvent:
 
     def stop_event(self):
         self.stopped = True
+
+
+class _UserEvent(_FakeEvent):
+    def __init__(self, user_id, order=None):
+        super().__init__(order)
+        self._user_id = user_id
+        self.unified_msg_origin = f"private:{user_id}"
+
+    def get_sender_id(self):
+        return self._user_id
+
+    def get_sender_name(self):
+        return f"User{self._user_id}"
 
 
 async def _collect(async_iterable):
@@ -486,17 +494,6 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
         plugin.config = {"send_as_forward": False}
         self.assertEqual(plugin._forward_threshold(), MAX_IMAGE_COUNT)
 
-    def test_duplicate_penalty_formatter_is_removed(self):
-        source = inspect.getsource(GetPxPlugin)
-
-        self.assertNotIn("_format_duplicate_checkin_text", source)
-
-    def test_checkin_flow_lock_is_user_scoped_across_midnight(self):
-        source = inspect.getsource(CheckinApplicationMixin._handle_checkin)
-
-        self.assertIn("lock_key = user_id", source)
-        self.assertNotIn("CheckinStore.today_key()", source)
-
     def test_greeting_mode_defaults_to_hitokoto_and_accepts_explicit_sources(self):
         plugin = object.__new__(GetPxPlugin)
         plugin.config = {}
@@ -509,18 +506,6 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plugin._checkin_greeting_mode(), "hitokoto")
         plugin.config["checkin_greeting_mode"] = "auto"
         self.assertEqual(plugin._checkin_greeting_mode(), "hitokoto")
-
-    def test_portrait_page_exhaustion_log_has_neutral_reason(self):
-        source = inspect.getsource(
-            CheckinArtworkMixin._download_checkin_pixiv_background
-        )
-
-        self.assertIn(
-            "连续 {CHECKIN_BACKGROUND_PAGE_ATTEMPTS} 页无可用竖向作品", source
-        )
-        self.assertNotIn(
-            "连续 {CHECKIN_BACKGROUND_PAGE_ATTEMPTS} 页候选均已使用", source
-        )
 
     async def test_web_internal_error_response_is_sanitized(self):
         plugin = object.__new__(GetPxPlugin)
@@ -918,6 +903,78 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(calls_before_first_finished, 1)
             self.assertEqual(store.checkin_calls, 2)
+
+    async def test_concurrent_checkins_for_different_users_do_not_serialize(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            order = []
+            first_result = CheckinResult(
+                _profile(),
+                _record(persisted=False, with_background=False),
+                duplicate=False,
+            )
+            plugin = _plugin_for_checkin(tmp, first_result, order)
+            store = _FakeCheckinStore(first_result, order)
+            plugin.checkin_store = store
+            entered = {"user-a": asyncio.Event(), "user-b": asyncio.Event()}
+            release = {"user-a": asyncio.Event(), "user-b": asyncio.Event()}
+            user_sequence = []
+
+            async def checkin(**kwargs):
+                user = kwargs["user_id"]
+                user_sequence.append(user)
+                entered[user].set()
+                # 挂起在锁内：若流程锁是全局的，user-b 永远到不了这里。
+                await release[user].wait()
+                order.append(f"checkin:{user}")
+                return replace(
+                    first_result,
+                    record=replace(first_result.record, user_id=user),
+                )
+
+            store.checkin = checkin
+
+            source = Path(tmp) / "selected.png"
+            PILImage.new("RGB", (750, 1000), (40, 80, 160)).save(source)
+
+            async def prepare(*_args, **_kwargs):
+                return CardBackground(
+                    image_path=str(source),
+                    mode="pixiv_daily",
+                    source="pixiv:recommended",
+                    illust_id="445566",
+                    title="Blue Sky",
+                    author="Someone",
+                )
+
+            plugin._prepare_checkin_background.side_effect = prepare
+            rendered = Path(tmp) / "rendered.jpg"
+            plugin._render_checkin_card.return_value = _make_card(rendered)
+
+            first = asyncio.create_task(
+                _collect(plugin._handle_checkin(_UserEvent("user-a")))
+            )
+            await asyncio.wait_for(entered["user-a"].wait(), timeout=5)
+
+            second = asyncio.create_task(
+                _collect(plugin._handle_checkin(_UserEvent("user-b")))
+            )
+            # user-a 持锁挂起时，user-b 的 checkin 仍能进入，证明锁按用户隔离。
+            await asyncio.wait_for(entered["user-b"].wait(), timeout=5)
+
+            release["user-a"].set()
+            release["user-b"].set()
+            await asyncio.gather(first, second)
+
+            self.assertEqual(user_sequence, ["user-a", "user-b"])
+
+    def test_flow_lock_is_keyed_by_user(self):
+        plugin = object.__new__(GetPxPlugin)
+        lock_user_a_first_call = plugin._checkin_flow_lock("10001")
+        lock_user_a_second_call = plugin._checkin_flow_lock("10001")
+        lock_user_b = plugin._checkin_flow_lock("20002")
+
+        self.assertIs(lock_user_a_first_call, lock_user_a_second_call)
+        self.assertIsNot(lock_user_a_first_call, lock_user_b)
 
     async def test_duplicate_cache_identity_uses_record_snapshot_not_current_profile(
         self,

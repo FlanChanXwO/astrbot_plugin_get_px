@@ -7,7 +7,7 @@
 一个面向 AstrBot 的安全发图与签到插件：Lolicon 优先取图，失败时可用 Pixiv refresh_token 回退，并在 WebUI 管理群排行、成员数值、内容安全和签到数据。
 
 ![AstrBot](https://img.shields.io/badge/AstrBot-plugin-5865f2?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.5.1-22c55e?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.6.0-22c55e?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-OneBot%20%2F%20aiocqhttp-f97316?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-3b82f6?style=flat-square)
@@ -41,7 +41,7 @@
 | `06` · 丹枫 | `07` · 寒梅 |
 | ![丹枫](templates/checkin_themes/autumn/preview.png) | ![寒梅](templates/checkin_themes/winter/preview.png) |
 
-签到卡支持 `省流量`（960×540）、`清晰`（1248×702）和 `极致`（1728×972）三档。`/签到商店 主题查看 <编号>` 可免费看预览（如 `/签到商店 主题查看 1`），不扣金币、不切换主题。
+签到卡支持 `省流量`（960×540）、`清晰`（1248×702）和 `极致`（1728×972）三档。`/签到主题 查看 <编号>` 可免费看预览（如 `/签到主题 查看 1`），不扣金币、不切换主题。
 
 ### WebUI 管理中心
 
@@ -77,10 +77,9 @@
 ```text
 /p 初音ミク 3
 /签到
-/签到我的
-/签到排行
-/签到商店
-/签到管理
+/签到状态
+/签到日历 2026-08
+/刷新背景
 /签到帮助
 ```
 
@@ -102,20 +101,24 @@
 
 | 指令 | 说明 | 示例 |
 | --- | --- | --- |
-| `/p [标签] [数量]` | 按标签搜索发图 | `/p 初音ミク 3` |
-| `/p [数量]` | 无标签时随机发图 | `/p 5` |
+| `/p [标签] [数量]` | 按标签搜索发图（成功发图消耗金币，`p_coin_cost` 可配，0 为免费） | `/p 初音ミク 3` |
+| `/p [数量]` | 无标签时随机发图（同上费用规则） | `/p 5` |
 | `/签到` | 每日签到 | `/签到` |
-| `/签到我的 状态` | 金币、好感、连签等 | `/签到我的 状态` |
+| `/签到状态` | 金币、好感、连签等 | `/签到状态` |
+| `/签到日历 [YYYY-MM]` | 个人月度签到日历图 | `/签到日历 2026-08` |
 | `/签到排行 今日\|月榜\|连签\|累计` | 当前群的签到排行 | `/签到排行 月榜` |
-| `/签到商店 查看` | 加持、背景刷新、主题商品 | `/签到商店 查看` |
-| `/签到商店 主题查看 <编号>` | 免费主题预览 | `/签到商店 主题查看 1` |
+| `/签到商店 查看` | 加持、背景刷新 | `/签到商店 查看` |
+| `/签到主题 查看 <编号>` | 免费主题预览 | `/签到主题 查看 1` |
 
-签到功能按四个独立指令组组织：
+签到功能按平铺高频指令 + 小组组织：
 
 ```text
-签到我的：状态、生日查看/设置/清除、成就、称号查看、称号佩戴
+/签到状态、/签到成就、/签到日历 [YYYY-MM]、刷新背景
+签到生日：查看、设置、清除
+签到称号：查看、佩戴
 签到排行：今日、月榜、连签、累计
-签到商店：加持、主题列表/查看/购买/切换、刷新背景
+签到商店：查看、加持
+签到主题：列表、查看、购买、切换
 签到管理：预览、导出、事件查看/添加/删除
 ```
 
@@ -162,7 +165,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | `pixiv_refresh_token` | 可选，作为 Lolicon 失败后的 Pixiv 回退 |
 | `image_quality` | 省流量用 `large`，优先原图用 `original` |
 | `forward_threshold` | 仅 aiocqhttp：`0` 始终合并转发；`1` 表示超过 1 张图才合并转发 |
-| `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致` |
+| `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致`；签到卡与日历完全同档（省流量 1600×900、清晰 2080×1170、极致 2880×1620） |
 | `dedupe_days` | 默认 `1`；需要跨日避免重复时可设为 `2–7`，`0` 为关闭 |
 | `lolicon_image_proxy_origins` | 图片地址无法访问时再配置；每行一个 http(s) origin |
 | `auto_trigger_enabled` | 需要「来张图」时再开 |
@@ -192,7 +195,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | `checkin_background_tag` | 签到背景标签；留空时 Lolicon 随机取图，失败后使用 Pixiv 推荐作品 | 空 |
 | `checkin_custom_background` | 本地图片路径；默认主题按竖向作品相框完整显示 | 空 |
 | `checkin_avatar_enabled` | 签到卡片显示用户头像 | `true` |
-| `checkin_card_quality_tier` | 签到卡画质：`省流量` / `清晰` / `极致`；预览和刷新背景立即生效，普通重复签到保持当天档位 | `省流量` |
+| `checkin_card_quality_tier` | 签到卡画质：`省流量` / `清晰` / `极致`；签到日历输出分辨率与背景画质完全跟随该档位；预览和刷新背景立即生效，普通重复签到保持当天档位 | `省流量` |
 | `checkin_greeting_mode` | 签到问候来源：`local` / `hitokoto` / `ai` | `hitokoto` |
 | `checkin_hitokoto_categories` | 一言类型中文多选；选择”全部”或留空时从全部分类随机 | `全部` |
 | `checkin_ai_greeting_provider_id` | 签到问候文本模型；留空时尝试当前会话模型，仍不可用则使用本地文案 | 空 |

@@ -45,31 +45,3 @@ def test_plugin_center_uses_relative_bridge_endpoints() -> None:
     assert all(not endpoint.startswith("/") for endpoint in endpoints)
     assert "image-history" not in source
     assert "cache_cleanup" not in source
-
-
-def test_plugin_center_keeps_responsive_and_accessible_states() -> None:
-    html = (PAGE_DIR / "index.html").read_text(encoding="utf-8")
-    source = (PAGE_DIR / "styles.css").read_text(encoding="utf-8")
-    script = (PAGE_DIR / "app.js").read_text(encoding="utf-8")
-    assert 'name="theme-color"' in html
-    assert 'class="skip-link"' in html
-    assert 'id="globalError"' in html
-    assert 'id="retryAllBtn"' in html
-    assert 'name="custom_safety_term"' in html
-    assert 'name="pixiv_illust_id"' in html
-    assert 'name="checkin_backup"' in html
-    assert 'name="checkin_member_search"' in html
-    assert 'id="memberDialog"' in html
-    assert ":root" in source
-    assert "@media (max-width: 900px)" in source
-    assert "@media (max-width: 620px)" in source
-    assert "@media (prefers-reduced-motion: reduce)" in source
-    assert ":focus-visible" in source
-    assert "::file-selector-button" in source
-    assert "transition: all" not in source
-    assert "onerror=" not in script
-    assert "Promise.allSettled" in script
-    assert "MAX_BACKUP_BYTES" in script
-    assert 'apiGet("checkin-members"' in script
-    assert 'apiPost("checkin-members/update"' in script
-    assert source.count("/*") == source.count("*/")

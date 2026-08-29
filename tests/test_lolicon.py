@@ -1,4 +1,8 @@
+import sys
 import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from astrbot_plugin_get_px.pixiv.lolicon import LoliconClient
 from astrbot_plugin_get_px.pixiv.constants import AIOCQHTTP_PLATFORM
@@ -131,7 +135,9 @@ class LoliconClientTest(unittest.IsolatedAsyncioTestCase):
         session = _FakeSession()
         client._session = session
 
-        results = await client.search("初音ミク", count=3, aspect_ratio="vertical")
+        results = await client.search(
+            "初音ミク", count=3, aspect_ratio="gt0.60lt0.90"
+        )
 
         self.assertEqual(results[0]["id"], "123:1")
         self.assertEqual(results[0]["page"], 1)
@@ -145,7 +151,7 @@ class LoliconClientTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(("r18", "0"), params)
         self.assertIn(("excludeAI", "true"), params)
         self.assertIn(("tag", "初音ミク"), params)
-        self.assertIn(("aspectRatio", "vertical"), params)
+        self.assertIn(("aspectRatio", "gt0.60lt0.90"), params)
         self.assertEqual([value for key, value in params if key == "size"], [
             "original", "regular", "small", "thumb", "mini"
         ])

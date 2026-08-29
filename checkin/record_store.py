@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import closing
+from dataclasses import replace
 from datetime import date, timedelta
 import math
+import re
 import sqlite3
 
 from .models import (
@@ -19,6 +21,7 @@ from .models import (
     CheckinProfile,
     CheckinRecord,
     CheckinResult,
+    CoinSpendResult,
 )
 from .rules import (
     daily_base_reward as _daily_base_reward,
@@ -56,7 +59,48 @@ _MEMBER_SELECT = """
 """
 
 
+def _month_bounds(month: str, *, current_month: str) -> tuple[str, str]:
+    """把 YYYY-MM 校验为目标月首日到下月首日的半开区间；非法或未来月报错。"""
+    if not isinstance(month, str) or re.fullmatch(r"\d{4}-\d{2}", month) is None:
+        raise ValueError("month must use YYYY-MM")
+    try:
+        start = date.fromisoformat(f"{month}-01")
+    except ValueError as exc:
+        raise ValueError("month must use YYYY-MM") from exc
+    if month > current_month:
+        raise ValueError("month must not be in the future")
+    end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+    return start.isoformat(), end.isoformat()
+
+
 class RecordStoreMixin:
+    async def list_month_records(
+        self, *, user_id: str, month: str
+    ) -> list[CheckinRecord]:
+        """只返回目标月内的签到记录，按日期升序；空用户不建档。"""
+        user_id = str(user_id or "")
+        start, end = _month_bounds(
+            str(month or ""), current_month=self.today_key()[:7]
+        )
+        if not user_id:
+            return []
+        async with self._lock:
+            return await asyncio.to_thread(self._list_month_records_sync, user_id, start, end)
+
+    def _list_month_records_sync(
+        self, user_id: str, start: str, end: str
+    ) -> list[CheckinRecord]:
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM checkin_records
+                WHERE user_id = ? AND date_key >= ? AND date_key < ?
+                ORDER BY date_key ASC
+                """,
+                (user_id, start, end),
+            ).fetchall()
+        return [self._row_to_record(row) for row in rows]
+
     async def find_profile(self, user_id: str) -> CheckinProfile | None:
         user_id = str(user_id or "")
         if not user_id:
@@ -265,6 +309,71 @@ class RecordStoreMixin:
                 self.today_key(),
                 self.now_iso(),
             )
+
+    async def spend_coins(self, *, user_id: str, cost: int) -> CoinSpendResult:
+        if isinstance(cost, bool) or not isinstance(cost, int) or cost < 0:
+            raise ValueError("coin cost must be a non-negative integer")
+        async with self._lock:
+            return await asyncio.to_thread(
+                self._spend_coins_sync, str(user_id or ""), int(cost)
+            )
+
+    def _spend_coins_sync(self, user_id: str, cost: int) -> CoinSpendResult:
+        if not user_id:
+            raise ValueError("user_id is required")
+        now = self.now_iso()
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                # 新用户在同一连接上创建 0 币档案，避免另开连接触发写锁死锁。
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO checkin_users (
+                        user_id, coins, affection, total_days, streak_days,
+                        last_checkin_date, boost_start_date, boost_until_date,
+                        repeat_penalty_date, repeat_penalty_total,
+                        created_at, updated_at
+                    )
+                    VALUES (?, 0, 0, 0, 0, '', '', '', '', 0, ?, ?)
+                    """,
+                    (user_id, now, now),
+                )
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO checkin_user_themes
+                        (user_id, theme_id, price_paid, acquired_at)
+                    VALUES (?, 'default', 0, ?)
+                    """,
+                    (user_id, now),
+                )
+                profile_row = conn.execute(
+                    "SELECT * FROM checkin_users WHERE user_id = ?",
+                    (user_id,),
+                ).fetchone()
+                profile = self._row_to_profile(profile_row)
+                if profile.coins < cost:
+                    conn.commit()  # 空事务提交以释放写锁
+                    return CoinSpendResult(
+                        success=False,
+                        profile=profile,
+                        cost=cost,
+                        message=f"金币不足，需要 {cost}，当前只有 {profile.coins}。",
+                    )
+                remaining = profile.coins - cost
+                conn.execute(
+                    "UPDATE checkin_users SET coins = ?, updated_at = ? "
+                    "WHERE user_id = ?",
+                    (remaining, now, user_id),
+                )
+                conn.commit()
+                # 提交后不得再回读档案：回读一旦失败会被调用方误报为“本次不扣费”。
+                updated_profile = replace(profile, coins=remaining)
+            except Exception:
+                conn.rollback()
+                raise
+        return CoinSpendResult(
+            success=True, profile=updated_profile, cost=cost, message="扣费成功"
+        )
 
     async def update_record_content(
         self,

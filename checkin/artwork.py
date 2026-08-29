@@ -13,6 +13,7 @@ from astrbot.core.star.star_tools import StarTools
 
 from .models import CheckinRecord
 from .background import (
+    CHECKIN_ARTWORK_ASPECT_PARAM,
     CHECKIN_ARTWORK_TARGET_RATIO,
     CHECKIN_ARTWORK_TOLERANCE,
     filter_illusts_by_aspect_ratio,
@@ -21,10 +22,17 @@ from .card import (
     CHECKIN_CARD_HEIGHT,
     CHECKIN_CARD_WIDTH,
     CardBackground,
+    _file_to_data_url,
     build_checkin_card_data,
     get_checkin_card_template,
 )
 from .cache import is_valid_card_jpeg
+from .calendar import (
+    CHECKIN_CALENDAR_HEIGHT,
+    CHECKIN_CALENDAR_WIDTH,
+    build_checkin_calendar_data,
+    get_checkin_calendar_template,
+)
 from .quality import (
     CHECKIN_JPEG_QUALITY,
     DEFAULT_CHECKIN_RENDER_TIER,
@@ -45,6 +53,13 @@ _CHECKIN_BACKGROUND_MODE_LABELS = {
 def _checkin_background_mode_label(background: CardBackground | None) -> str:
     mode = getattr(background, "mode", "") or "none"
     return _CHECKIN_BACKGROUND_MODE_LABELS.get(str(mode), str(mode))
+
+_CALENDAR_BG_RATIO = 16 / 9
+_CALENDAR_BG_RATIO_TOLERANCE = 0.10
+# Lolicon aspectRatio 支持数值条件组合（gt/gte/lt/lte/eq）；
+# "landscape"/"portrait" 等枚举值不是合法语法，传了等于没筛。
+_CALENDAR_BG_ASPECT_PARAM = "gt1.7lt1.8"
+
 
 try:
     from ..pixiv.index import ordered_by_unused
@@ -613,7 +628,7 @@ class CheckinArtworkMixin:
                     selected_tag,
                     count=20,
                     offset=transient_offset if preview_nonce else 0,
-                    aspect_ratio="vertical",
+                    aspect_ratio=CHECKIN_ARTWORK_ASPECT_PARAM,
                     use_page_cursor=not preview_nonce,
                 )
             except Exception as e:
@@ -861,6 +876,151 @@ class CheckinArtworkMixin:
             return
         await self._release_checkin_background_usage(
             event, background.source, background.illust_id
+        )
+
+    async def _prepare_checkin_calendar_background(
+        self,
+        event: AstrMessageEvent,
+        *,
+        user_id: str,
+        background_quality: str = "medium",
+    ) -> CardBackground | None:
+        """为日历取一张 16:9 邻域横图氛围背景；不占去重池，失败按无图兜底。
+
+        ``background_quality`` 跟随签到卡画质档位（省流量=medium、清晰/极致=large）；
+        两源在下载器内已归一化到同一质量枚举，无需按来源区分。
+        """
+        try:
+            illusts, _raw_count, source_key = await self._fetch_source_candidates(
+                event, "", count=20, aspect_ratio=_CALENDAR_BG_ASPECT_PARAM,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 日历背景请求失败，使用无图兜底: "
+                f"error_type={type(exc).__name__}"
+            )
+            return CardBackground(mode="fallback", source="fallback")
+        if self._cfg_bool("filter_manga", True):
+            illusts = self._filter_manga(illusts)
+        try:
+            illusts = await self._filter_blacklisted_illusts(illusts)
+        except RuntimeError as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 日历背景安全检查不可用，使用无图兜底: "
+                f"error_type={type(exc).__name__}"
+            )
+            return CardBackground(mode="fallback", source="fallback")
+        # Pixiv 回退路径不经过 API 端筛选，本地按 16:9±0.1 复核。
+        illusts = filter_illusts_by_aspect_ratio(
+            illusts, _CALENDAR_BG_RATIO, _CALENDAR_BG_RATIO_TOLERANCE
+        )
+        used_ids = set(await self._checkin_background_used_ids(event, source_key))
+        ordered = [
+            illust
+            for illust in ordered_by_unused(illusts, used_ids)
+            if str(illust.get("id") or "") not in used_ids
+        ] or illusts
+        timeout_sec = self._cfg_float("request_timeout", 30.0, 5.0, 120.0)
+        for illust in ordered[:8]:
+            illust_id = str(illust.get("id") or "")
+            if not illust_id:
+                continue
+            try:
+                reason = await self._blacklist_reason_for_illust(illust, illust_id)
+            except RuntimeError as exc:
+                logger.warning(
+                    f"{LOG_PREFIX} 日历背景安全检查不可用，跳过作品: "
+                    f"illust_id={illust_id} error_type={type(exc).__name__}"
+                )
+                continue
+            if reason:
+                continue
+            try:
+                path, actual_q, file_size = await self.downloader.download_for_send(
+                    illust,
+                    background_quality,
+                    timeout=timeout_sec,
+                    downgrade_limit_bytes=0,
+                    log_context=f"[日历背景] 作品 {illust_id}",
+                )
+            except Exception as exc:
+                logger.debug(
+                    f"{LOG_PREFIX} 日历背景候选跳过: reason=download_error "
+                    f"illust_id={illust_id} error_type={type(exc).__name__}"
+                )
+                continue
+            return CardBackground(
+                image_path=path,
+                mode="pixiv_daily",
+                source=source_key,
+                illust_id=illust_id,
+                title=str(illust.get("title") or ""),
+                author=str((illust.get("user") or {}).get("name") or ""),
+                illust=illust,
+                quality=actual_q,
+                file_size=file_size,
+            )
+        logger.info(
+            f"{LOG_PREFIX} 日历背景无可用横图，使用无图兜底: "
+            f"reason=no_landscape_candidate"
+        )
+        return CardBackground(mode="fallback", source="fallback")
+
+    async def _render_checkin_calendar(
+        self,
+        *,
+        month: str,
+        today_key: str,
+        records,
+        background: CardBackground | None = None,
+        events=(),
+        render_tier: str | None = None,
+    ) -> str:
+        background_credit = ""
+        if background is not None and getattr(background, "illust_id", ""):
+            background_credit = getattr(background, "pixiv_caption", "") or ""
+        # 读文件 + PIL 校验 + base64 可达数 MB，与视图组装一并放进线程池
+        background_url = await asyncio.to_thread(
+            _file_to_data_url,
+            str(getattr(background, "image_path", "") or ""),
+        )
+        data = await asyncio.to_thread(
+            build_checkin_calendar_data,
+            month=month,
+            today_key=today_key,
+            records=records,
+            background_url=background_url,
+            background_credit=background_credit,
+            events=events,
+        )
+        # 与签到卡同一缩放语义：clip/viewport 恒为设计画布 1600×900，
+        # 输出分辨率由端点 device_scale_factor 决定（省流量无缩放、清晰 1.3x、极致 1.8x）
+        render_spec = get_checkin_render_tier(
+            render_tier or DEFAULT_CHECKIN_RENDER_TIER
+        )
+        options = {
+            "full_page": True,
+            "type": "jpeg",
+            "quality": CHECKIN_JPEG_QUALITY,
+            "clip": {
+                "x": 0,
+                "y": 0,
+                "width": CHECKIN_CALENDAR_WIDTH,
+                "height": CHECKIN_CALENDAR_HEIGHT,
+            },
+            "viewport": {
+                "width": CHECKIN_CALENDAR_WIDTH,
+                "height": CHECKIN_CALENDAR_HEIGHT,
+            },
+            "animations": "disabled",
+        }
+        if render_spec.scale_level is not None:
+            options["device_scale_factor_level"] = render_spec.scale_level
+        return await self.html_render(
+            get_checkin_calendar_template(),
+            data,
+            return_url=False,
+            options=options,
         )
 
     async def _checkin_background_used_ids(

@@ -10,10 +10,18 @@ test-results/
 .claude/
 .agents/
 .omo/
+.codegraph/
 scratch/
 data/
 docs/images/checkin-event-matrix/
 
-# 暂不提交
+# 协作 agent 入口：CLAUDE.md 由工具自动生成、不入库
 CLAUDE.md
-AGENTS.md
+
+# 开发工具、素材与本地预览
+templates/checkin_themes/_dev/
+templates/checkin_calendar/_dev/
+
+# 本地进度记录与规划文档
+Progress/
+docs/superpowers/

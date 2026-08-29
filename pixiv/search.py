@@ -41,6 +41,34 @@ class SearchMixin:
     ) -> bool:
         return platform_name == AIOCQHTTP_PLATFORM and downloaded_count > threshold
 
+    def _p_unit_cost(self) -> int:
+        return self._cfg_int("p_coin_cost", 20, 0, 500)
+
+    def _p_charging_active(self) -> bool:
+        return (
+            self._p_unit_cost() > 0
+            and self._cfg_bool("checkin_enabled", True)
+            and getattr(self, "checkin_store", None) is not None
+        )
+
+    async def _p_balance_error(self, user_id: str, count: int) -> str:
+        """返回余额不足提示；余额充足或钱包不可用时返回空串。"""
+        cost = self._p_unit_cost()
+        if not user_id or cost <= 0 or count <= 0:
+            return ""
+        try:
+            profile = await self.checkin_store.get_profile(user_id)
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} /p 金币预检失败，本次免检放行: "
+                f"error_type={type(exc).__name__}"
+            )
+            return ""
+        total = cost * count
+        if profile.coins < total:
+            return f"金币不足，需要 {total}，当前只有 {profile.coins}。"
+        return ""
+
     def _ensure_client_or_error(self, event: AstrMessageEvent) -> bool:
         lolicon_client = getattr(self, "lolicon_client", None)
         if lolicon_client and lolicon_client.available:
@@ -181,6 +209,14 @@ class SearchMixin:
             count = max(1, min(int(count_str), max_count)) if count_str else 1
         except (TypeError, ValueError):
             count = 1
+
+        # 金币预检：请求张数 × 单价，余额不足直接提醒并终止。
+        if self._p_charging_active():
+            sender_id = str(event.get_sender_id() or "")
+            balance_error = await self._p_balance_error(sender_id, count)
+            if balance_error:
+                yield event.plain_result(balance_error)
+                return
 
         try:
             if tag and await self._blocked_query_term(tag):
@@ -407,7 +443,8 @@ class SearchMixin:
                         for attempt in range(1, max_retries + 1):
                             try:
                                 await event.send(event.chain_result(content))
-                                sent_illust_ids.add(str(illust.get("id") or ""))
+                                if illust.get("id"):
+                                    sent_illust_ids.add(str(illust.get("id")))
                                 logger.info(
                                     f"{LOG_PREFIX} [降级] 作品 {illust_id} 已发送"
                                 )
@@ -461,7 +498,8 @@ class SearchMixin:
                     for attempt in range(1, max_retries + 1):
                         try:
                             await event.send(event.chain_result(content))
-                            sent_illust_ids.add(str(illust.get("id") or ""))
+                            if illust.get("id"):
+                                sent_illust_ids.add(str(illust.get("id")))
                             logger.info(
                                 f"{LOG_PREFIX} 作品 {illust_id} 已发送"
                                 + (f" (第{attempt}次尝试)" if attempt > 1 else "")
@@ -502,6 +540,52 @@ class SearchMixin:
                                 except Exception:
                                     pass
         finally:
+            if self._p_charging_active() and sent_illust_ids:
+                total_cost = self._p_unit_cost() * len(sent_illust_ids)
+                try:
+                    result = await self.checkin_store.spend_coins(
+                        user_id=str(event.get_sender_id() or ""),
+                        cost=total_cost,
+                    )
+                    if not result.success:
+                        logger.warning(
+                            f"{LOG_PREFIX} /p 金币结算未完成: "
+                            f"sent_count={len(sent_illust_ids)} cost={total_cost} "
+                            f"result_message={result.message}"
+                        )
+                        try:
+                            await event.send(
+                                event.plain_result(
+                                    f"⚠️ 金币结算未完成：{result.message}"
+                                )
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                f"{LOG_PREFIX} 发送金币结算警告失败: "
+                                f"error_type={type(exc).__name__}"
+                            )
+                    else:
+                        logger.info(
+                            f"{LOG_PREFIX} /p 金币结算: "
+                            f"sent_count={len(sent_illust_ids)} cost={total_cost}"
+                        )
+                        try:
+                            await event.send(
+                                event.plain_result(
+                                    f"💰 本次发图消耗 {total_cost} 金币"
+                                    f"（{len(sent_illust_ids)} 张），余额 {result.profile.coins}。"
+                                )
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                f"{LOG_PREFIX} 发送金币结算提醒失败: "
+                                f"error_type={type(exc).__name__}"
+                            )
+                except Exception as exc:
+                    logger.warning(
+                        f"{LOG_PREFIX} /p 金币结算失败，本次不扣费: "
+                        f"error_type={type(exc).__name__}"
+                    )
             for p in temp_paths:
                 cleanup(p)
             if pending_illust_ids and self.image_index is not None:

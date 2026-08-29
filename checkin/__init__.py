@@ -22,6 +22,7 @@ from .models import (
     CheckinRecord,
     CheckinResult,
     CheckinUserPreference,
+    CoinSpendResult,
 )
 from .rules import (
     affection_level,
@@ -58,6 +59,7 @@ __all__ = [
     "CheckinResult",
     "CheckinStore",
     "CheckinUserPreference",
+    "CoinSpendResult",
     "UnversionedCheckinDatabaseError",
     "affection_level",
     "boost_remaining_days",

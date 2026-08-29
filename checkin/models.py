@@ -157,3 +157,11 @@ class CheckinGlobalEvent:
     created_by: str
     created_at: str
     updated_at: str
+
+
+@dataclass(frozen=True)
+class CoinSpendResult:
+    success: bool
+    profile: CheckinProfile
+    cost: int
+    message: str

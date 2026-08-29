@@ -10,7 +10,7 @@
 
 签到卡片运行时依赖 AstrBot 的 HTML/T2I 渲染能力。开发和排查签到卡片问题时，建议准备一个本地 T2I 服务。
 
-当前测试不强制要求本地 T2I 服务，但签到卡片视觉效果需要真实渲染验证。
+当前测试不强制要求本地 T2I 服务，但签到卡片视觉效果需要真实渲染验证。渲染链路、画布约定与自建端点本地重渲方法见 [`t2i-rendering.md`](./t2i-rendering.md)。
 
 ## 本地代码位置
 
@@ -94,7 +94,7 @@ python main.py
 1. 阅读 [`../user/checkin.md`](../user/checkin.md) 了解业务规则
 2. 修改相关模块（`checkin/application.py`、`checkin/rules.py` 等）
 3. 运行相关测试：`pytest tests/test_checkin_*.py -v`
-4. 手工验证：`/签到`、`/签到我的`、`/签到商店`
+4. 手工验证：`/签到`、`/签到状态`、`/签到商店`、`/签到主题`、`/签到日历`
 
 ### 修改配置项
 

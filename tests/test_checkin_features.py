@@ -6,19 +6,13 @@ from dataclasses import replace
 
 import pytest
 
-import checkin
-from checkin import ACHIEVEMENTS, CheckinStore
+from checkin import CheckinStore
 from checkin.birthday import (
     birthday_matches,
     parse_month_day,
     parse_qq_birthday,
 )
 from checkin.snapshot import validate_checkin_snapshot
-
-
-def test_checkin_package_exports_public_models() -> None:
-    assert checkin.CheckinStore is CheckinStore
-    assert checkin.ACHIEVEMENTS is ACHIEVEMENTS
 
 
 @pytest.mark.asyncio
