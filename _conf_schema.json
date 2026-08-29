@@ -34,21 +34,33 @@
     "description": "单次最大发送数量",
     "type": "int",
     "default": 5,
-    "slider": {"min": 1, "max": 20, "step": 1},
+    "slider": {
+      "min": 1,
+      "max": 20,
+      "step": 1
+    },
     "hint": "用户单次指令最多发送几张图。"
   },
   "p_coin_cost": {
     "description": "/p 指令发图金币单价",
     "type": "int",
     "default": 20,
-    "slider": {"min": 0, "max": 500, "step": 5},
+    "slider": {
+      "min": 0,
+      "max": 500,
+      "step": 5
+    },
     "hint": "使用 /p（或自然语言触发）成功发送每张图所消耗的金币；设为 0 表示免费。金币不足时仅提醒，图片下载或发送失败不扣币。"
   },
   "dedupe_days": {
     "description": "图片去重天数",
     "type": "int",
     "default": 1,
-    "slider": {"min": 0, "max": 7, "step": 1},
+    "slider": {
+      "min": 0,
+      "max": 7,
+      "step": 1
+    },
     "hint": "按北京时间自然日去重。0=关闭并清空去重记录，1=仅当天，2-7=最近对应天数。同群成员共享；不同群、私聊用户、标签和图片源相互隔离。缩短天数会在插件重载时清理超期记录，增加天数无法恢复已清理历史。"
   },
   "dedupe_ttl_hours": {
@@ -67,28 +79,44 @@
     "description": "下载超时（秒）",
     "type": "float",
     "default": 30.0,
-    "slider": {"min": 5, "max": 120, "step": 5},
+    "slider": {
+      "min": 5,
+      "max": 120,
+      "step": 5
+    },
     "hint": "单张图片下载的最大等待时间。"
   },
   "image_quality": {
     "description": "图片质量",
     "type": "string",
     "default": "original",
-    "options": ["original", "large", "medium"],
+    "options": [
+      "original",
+      "large",
+      "medium"
+    ],
     "hint": "original=原图（最大，下载慢）, large=大图（推荐）, medium=中图（最小，下载快）。若原图超过自动降级阈值会降级到更低质量，指定质量不可用也会自动降级。"
   },
   "auto_downgrade_original_mb": {
     "description": "原图自动降级阈值（MiB）",
     "type": "float",
     "default": 3.0,
-    "slider": {"min": 0, "max": 100, "step": 0.5},
+    "slider": {
+      "min": 0,
+      "max": 100,
+      "step": 0.5
+    },
     "hint": "当实际下载到的原图超过该大小时，自动改用 large/medium 等低质量图片。设为 0 可禁用自动降级。"
   },
   "forward_threshold": {
     "description": "合并转发阈值",
     "type": "int",
     "default": 1,
-    "slider": {"min": 0, "max": 20, "step": 1},
+    "slider": {
+      "min": 0,
+      "max": 20,
+      "step": 1
+    },
     "hint": "成功下载的图片数量严格大于此值时以合并转发发送。设为 0 时始终合并转发；设为 1 时超过 1 张才合并转发。仅 aiocqhttp 平台支持合并转发，其他平台会自动逐条发送。"
   },
   "auto_trigger_enabled": {
@@ -113,21 +141,32 @@
     "description": "签到背景模式",
     "type": "string",
     "default": "pixiv_daily",
-    "options": ["pixiv_daily", "custom"],
+    "options": [
+      "pixiv_daily",
+      "custom"
+    ],
     "hint": "pixiv_daily = 每日从首选图片源自动选择背景；custom = 使用管理员配置的固定背景文件。"
   },
   "checkin_background_refresh_cost": {
     "description": "签到背景刷新价格",
     "type": "int",
     "default": 100,
-    "slider": {"min": 0, "max": 500, "step": 10},
+    "slider": {
+      "min": 0,
+      "max": 500,
+      "step": 10
+    },
     "hint": "用户完成当天签到后，使用“刷新背景”重新抽取图片源背景所需金币。设为 0 表示免费。"
   },
   "checkin_theme_cost": {
     "description": "签到主题价格",
     "type": "int",
     "default": 1500,
-    "slider": {"min": 0, "max": 5000, "step": 100},
+    "slider": {
+      "min": 0,
+      "max": 5000,
+      "step": 100
+    },
     "hint": "用户购买任意非默认签到主题所需金币。设为 0 表示免费；默认“米白”主题始终免费。"
   },
   "checkin_background_tag": {
@@ -152,15 +191,23 @@
     "description": "签到卡画质",
     "type": "string",
     "default": "省流量",
-    "options": ["省流量", "清晰", "极致"],
+    "options": [
+      "省流量",
+      "清晰",
+      "极致"
+    ],
     "obvious_hint": true,
-    "hint": "省流量=960x540、medium 背景；清晰=1248x702、large 背景；极致=1728x972、large 背景。管理员预览和主动刷新背景立即使用当前配置；普通重复签到保持当天记录档位。"
+    "hint": "省流量=960x540、medium 背景；清晰=1248x702、large 背景；极致=1728x972、large 背景。管理员预览和主动刷新背景立即使用当前配置；普通重复签到保持当天记录档位。签到日历与签到卡完全同档：省流量=1600×900+medium 背景、清晰=2080×1170+large 背景、极致=2880×1620+large 背景。"
   },
   "checkin_greeting_mode": {
     "description": "签到问候来源",
     "type": "string",
     "default": "hitokoto",
-    "options": ["local", "hitokoto", "ai"],
+    "options": [
+      "local",
+      "hitokoto",
+      "ai"
+    ],
     "hint": "local=本地事件文案；hitokoto=一言 API；ai=AstrBot 文本模型。远程请求、响应校验或保存失败时自动保留本地文案，不影响签到卡生成。"
   },
   "checkin_hitokoto_categories": {
@@ -181,7 +228,9 @@
       "抖机灵",
       "其他"
     ],
-    "default": ["全部"],
+    "default": [
+      "全部"
+    ],
     "hint": "可多选；每次签到只随机返回一句，类型在勾选范围内随机。选择“全部”或不选择时从所有类型随机。"
   },
   "checkin_ai_greeting_provider_id": {
@@ -201,27 +250,43 @@
     "description": "签到问候超时（秒）",
     "type": "float",
     "default": 8.0,
-    "slider": {"min": 1, "max": 30, "step": 1}
+    "slider": {
+      "min": 1,
+      "max": 30,
+      "step": 1
+    }
   },
   "checkin_hitokoto_timeout": {
     "description": "一言请求超时（秒）",
     "type": "float",
     "default": 5.0,
-    "slider": {"min": 1, "max": 15, "step": 1},
+    "slider": {
+      "min": 1,
+      "max": 15,
+      "step": 1
+    },
     "hint": "请求 https://v1.hitokoto.cn/ 的最长等待时间；超时或返回内容不合规时使用本地问候。"
   },
   "rate_limit_seconds": {
     "description": "请求频率限制（秒）",
     "type": "int",
     "default": 3,
-    "slider": {"min": 0, "max": 60, "step": 1},
+    "slider": {
+      "min": 0,
+      "max": 60,
+      "step": 1
+    },
     "hint": "同一用户两次请求的最小间隔，设为 0 禁用。防止刷屏。"
   },
   "webui_font_source": {
     "description": "WebUI 字体来源",
     "type": "string",
     "default": "mirror",
-    "options": ["mirror", "official", "none"],
+    "options": [
+      "mirror",
+      "official",
+      "none"
+    ],
     "hint": "插件管理中心加载 Google Fonts 的方式。mirror = 国内镜像（默认，速度快），official = 官方源，none = 不加载外部字体（使用系统字体）。"
   }
 }

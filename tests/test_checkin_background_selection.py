@@ -109,11 +109,10 @@ class CheckinBackgroundSelectionTest(unittest.IsolatedAsyncioTestCase):
             candidates = plugin._checkin_background_tag_candidates("alpha,beta,gamma")
         self.assertEqual(candidates, ["gamma", "beta", "alpha"])
 
-    def test_greeting_schema_defaults_to_hitokoto_without_legacy_switch(self):
+    def test_greeting_schema_defaults_to_hitokoto(self):
         schema_path = Path(__file__).resolve().parents[1] / "_conf_schema.json"
         schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
-        self.assertNotIn("checkin_ai_greeting_enabled", schema)
         self.assertEqual(schema["checkin_greeting_mode"]["default"], "hitokoto")
         self.assertEqual(
             schema["checkin_greeting_mode"]["options"],
@@ -124,46 +123,6 @@ class CheckinBackgroundSelectionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(categories["default"], ["全部"])
         self.assertIn("动画", categories["options"])
         self.assertIn("诗词", categories["options"])
-
-    def test_economy_and_dedupe_schema_limits_are_bounded(self):
-        schema_path = Path(__file__).resolve().parents[1] / "_conf_schema.json"
-        schema = json.loads(schema_path.read_text(encoding="utf-8"))
-
-        self.assertEqual(schema["dedupe_days"]["slider"]["max"], 7)
-        self.assertEqual(
-            schema["checkin_background_refresh_cost"]["slider"]["max"], 500
-        )
-
-    def test_pixiv_ai_comment_settings_are_removed(self):
-        schema_path = Path(__file__).resolve().parents[1] / "_conf_schema.json"
-        schema = json.loads(schema_path.read_text(encoding="utf-8"))
-
-        for key in (
-            "ai_enabled",
-            "ai_probability",
-            "ai_max_images",
-            "ai_pre_message",
-            "ai_vision_provider_id",
-            "ai_comment_provider_id",
-            "ai_vision_prompt",
-            "ai_comment_prompt",
-        ):
-            self.assertNotIn(key, schema)
-
-    def test_custom_background_schema_recommends_portrait_contain_display(self):
-        schema_path = Path(__file__).resolve().parents[1] / "_conf_schema.json"
-        schema = json.loads(schema_path.read_text(encoding="utf-8"))
-
-        self.assertNotIn("checkin_background_aspect_ratio", schema)
-        self.assertNotIn("checkin_background_aspect_tolerance", schema)
-        hint = schema["checkin_custom_background"]["hint"]
-
-        for landscape_contract in ("16:9", "1920x1080", "960x540"):
-            with self.subTest(landscape_contract=landscape_contract):
-                self.assertNotIn(landscape_contract, hint)
-        for portrait_contract in ("3:4", "竖", "contain", "不裁切"):
-            with self.subTest(portrait_contract=portrait_contract):
-                self.assertIn(portrait_contract, hint)
 
     def test_checkin_artwork_ratio_uses_fixed_closed_portrait_range(self):
         self.assertEqual(

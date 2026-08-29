@@ -13,8 +13,7 @@ from astrbot.core.star.star_tools import StarTools
 
 from .calendar import (
     CALENDAR_TEMPLATE_VERSION,
-    CHECKIN_CALENDAR_HEIGHT,
-    CHECKIN_CALENDAR_WIDTH,
+    calendar_output_size,
     collect_calendar_events,
 )
 try:
@@ -45,13 +44,9 @@ from .rules import (
 from .store import CheckinStore
 from .birthday import parse_month_day
 from .card import CardBackground
+from .quality import get_checkin_render_tier
 from .snapshot import dump_checkin_snapshot_json
 from .themes import get_checkin_theme
-
-try:
-    from ..pixiv.downloader import cleanup
-except ImportError:  # Direct imports used by the test suite.
-    from pixiv.downloader import cleanup
 
 
 LOG_PREFIX = "[GetPx]"
@@ -659,6 +654,11 @@ class CheckinCommandMixin:
         calendar_path = ""
         directly_rendered = False
         background: CardBackground | None = None
+        # 与签到卡完全同档：背景质量 + 输出缩放都来自 checkin_card_quality_tier，
+        # 两者都参与缓存 key（清晰与极致背景同为 large，靠输出尺寸区分）
+        render_spec = get_checkin_render_tier(self._configured_checkin_render_tier())
+        background_quality = render_spec.background_quality
+        output_width, output_height = calendar_output_size(render_spec.name)
         try:
             if cache is not None:
                 key = cache.cache_key(
@@ -668,13 +668,16 @@ class CheckinCommandMixin:
                     view_model={
                         "month": target_month,
                         "events": await self._calendar_custom_events_fingerprint(),
+                        "records": self._calendar_records_fingerprint(records),
+                        "background_quality": background_quality,
+                        "output_size": f"{output_width}x{output_height}",
                     },
                 )
                 calendar_path = str(
                     cache.get(
                         today_key,
                         key,
-                        expected_size=(CHECKIN_CALENDAR_WIDTH, CHECKIN_CALENDAR_HEIGHT),
+                        expected_size=(output_width, output_height),
                     )
                     or ""
                 )
@@ -682,7 +685,9 @@ class CheckinCommandMixin:
                 # 缓存命中时不取背景、不渲染；未命中才取一张氛围背景（失败降级无图）。
                 try:
                     background = await self._prepare_checkin_calendar_background(
-                        event, user_id=user_id
+                        event,
+                        user_id=user_id,
+                        background_quality=background_quality,
                     )
                 except Exception as exc:
                     logger.warning(
@@ -699,6 +704,7 @@ class CheckinCommandMixin:
                         records=records,
                         background=background,
                         events=raw_events,
+                        render_tier=render_spec.name,
                     )
 
                 if cache is not None:
@@ -707,10 +713,7 @@ class CheckinCommandMixin:
                             today_key,
                             key,
                             renderer,
-                            expected_size=(
-                                CHECKIN_CALENDAR_WIDTH,
-                                CHECKIN_CALENDAR_HEIGHT,
-                            ),
+                            expected_size=(output_width, output_height),
                         )
                     )
                 else:
@@ -748,7 +751,14 @@ class CheckinCommandMixin:
         custom_events = ()
         list_events = getattr(self.checkin_store, "list_global_events", None)
         if callable(list_events):
-            custom_events = tuple(await list_events())
+            try:
+                custom_events = tuple(await list_events())
+            except Exception as exc:
+                # 全局事件读库失败按空事件降级，不阻塞整张日历
+                logger.warning(
+                    f"{LOG_PREFIX} 日历全局事件读取失败，事件条按空处理: "
+                    f"month={target_month} error_type={type(exc).__name__}"
+                )
         try:
             return await asyncio.to_thread(
                 collect_calendar_events,
@@ -762,6 +772,18 @@ class CheckinCommandMixin:
                 f"month={target_month} error_type={type(exc).__name__}"
             )
             return []
+
+    @staticmethod
+    def _calendar_records_fingerprint(records) -> str:
+        """当月签到记录摘要纳入缓存 key：当日签到后重看日历立即重渲，不再命中旧图。"""
+        items = sorted(
+            (
+                str(getattr(record, "date_key", "") or ""),
+                int(getattr(record, "coins_reward", 0) or 0),
+            )
+            for record in records
+        )
+        return ",".join(f"{date_key}:{coins}" for date_key, coins in items)
 
     async def _calendar_custom_events_fingerprint(self) -> str:
         """自定义事件指纹（数量-最大ID）纳入缓存 key，管理员当日增删事件即失效重渲。"""

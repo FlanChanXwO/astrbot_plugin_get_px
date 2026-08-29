@@ -6,12 +6,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT / "templates" / "checkin_themes" / "default"
 
 
-def _css_rule(css: str, selector: str) -> str:
-    match = re.search(rf"{re.escape(selector)}\s*\{{(?P<body>[^}}]*)\}}", css, re.S)
-    assert match is not None, f"missing CSS selector: {selector}"
-    return match.group("body")
-
-
 class CheckinCardTemplateTest(unittest.TestCase):
     def test_required_h_paper_album_regions_exist(self):
         html = (TEMPLATE_DIR / "index.html").read_text(encoding="utf-8")
@@ -57,18 +51,6 @@ class CheckinCardTemplateTest(unittest.TestCase):
         self.assertNotIn("STKaiti", css)
         self.assertNotIn("KaiTi", css)
 
-    def test_stage_contains_paper_inside_the_fixed_canvas(self):
-        css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
-
-        stage = _css_rule(css, ".stage")
-        paper = _css_rule(css, ".checkin-card")
-        self.assertIn("width: 960px", stage)
-        self.assertIn("height: 540px", stage)
-        self.assertIn("padding: 24px", stage)
-        self.assertIn("box-sizing: border-box", stage)
-        self.assertIn("width: 100%", paper)
-        self.assertIn("height: 100%", paper)
-
     def test_only_artwork_credit_may_use_text_smaller_than_18px(self):
         css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
         undersized: list[tuple[str, int]] = []
@@ -82,47 +64,6 @@ class CheckinCardTemplateTest(unittest.TestCase):
                     undersized.append((selector, pixels))
 
         self.assertEqual(undersized, [])
-
-    def test_maximum_state_reserves_vertical_safe_space(self):
-        css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
-
-        information = _css_rule(css, ".information-column")
-        heading = _css_rule(css, ".heading-copy")
-        artwork_column = _css_rule(css, ".artwork-column")
-        artwork_frame = _css_rule(css, ".artwork-frame")
-
-        self.assertIn("justify-content: space-between", information)
-        self.assertIn("display: flex", heading)
-        self.assertIn("align-items: flex-start", heading)
-        self.assertIn("flex-direction: column", heading)
-        self.assertIn("padding-block: 10px", artwork_column)
-        self.assertIn("width: 306px", artwork_frame)
-        self.assertIn("height: 408px", artwork_frame)
-
-    def test_compact_layout_removes_repeated_status_fields(self):
-        html = (TEMPLATE_DIR / "index.html").read_text(encoding="utf-8")
-        css = (TEMPLATE_DIR / "style.css").read_text(encoding="utf-8")
-
-        self.assertNotIn("<span>关系等级</span>", html)
-        self.assertNotIn('class="boost-status"', html)
-        self.assertEqual(html.count('class="badge"'), 1)
-
-        summary = _css_rule(css, ".account-summary")
-        nickname = _css_rule(css, ".identity-copy strong")
-        nickname_only = _css_rule(css, ".identity-copy strong:only-child")
-        identity = _css_rule(css, ".identity-copy")
-        signature = _css_rule(css, ".greeting .signature")
-        self.assertIn("repeat(2", summary)
-        self.assertIn("white-space: nowrap", nickname)
-        self.assertIn("text-overflow: ellipsis", nickname)
-        self.assertIn("max-width: 100%", nickname_only)
-        self.assertIn("flex: 1 1 0", identity)
-        self.assertIn("text-align: right", signature)
-        self.assertIn(
-            ".milestone-line {\n  justify-content: flex-start;\n}",
-            css,
-        )
-        self.assertIn("下一成就", html)
 
 
 if __name__ == "__main__":

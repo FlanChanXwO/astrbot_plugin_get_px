@@ -1,0 +1,56 @@
+# AGENTS.md - astrbot_plugin_get_px
+
+本文件只保留协作 agent 的入口规则。项目细节按需阅读 `docs/project/`，开发维护规则优先阅读 `docs/dev/maintenance.md`。
+
+## 沟通语言
+
+- 与用户沟通必须使用中文。
+
+## 项目形态
+
+- **语言与框架**: Python 3.10+ / AstrBot plugin system
+- **插件职责**: Pixiv 图片获取、每日签到系统、金币商店、群排行、内容安全过滤、Plugin Pages 管理界面
+- **主要目录**:
+  - `main.py`: 插件生命周期、指令装饰器、配置读取和领域对象装配
+  - `checkin/`: 签到业务（数据模型、规则、存储、商店、卡片渲染）
+  - `pixiv/`: 作品获取（搜索、下载、安全过滤、多日去重索引）
+  - `plugin_api/` & `pages/`: Plugin Pages 后端 API 与前端管理界面（原生 HTML/CSS/JS）
+  - `tests/` & `docs/`: 自动化测试、项目文档
+  - `Progress/`: 本地开发进度记录（仅本地使用，不入库）
+
+## 技能与检索指引
+
+- **AstrBot 插件开发**: 涉及 AstrBot 插件生命周期、指令装饰器、消息链构造、事件流及配置 Schema 时，**必须参考 `skill-astrbot-dev`**。
+- **代码检索**: 仓库建有 CodeGraph 索引（`.codegraph/`）时，代码定位优先使用 CodeGraph。
+
+## 阅读入口
+
+- 任何改动前先看：`docs/dev/maintenance.md`
+- 架构与业务流转：`docs/project/architecture.md`
+- 配置项核对：`_conf_schema.json`、`README.md`、`docs/project/configuration.md`
+- 测试与工程规范：`docs/dev/testing.md`、`docs/dev/engineering-principles.md`
+
+## 核心硬约束
+
+- **入口职责**: 复杂业务逻辑放在领域模块，严禁将业务逻辑塞回 `main.py`。
+- **数据路径**: 必须使用 `StarTools.get_data_dir("astrbot_plugin_get_px")`，严禁依赖/创建 `<plugin>/data`。
+- **下载规范**: `downloader.download()` 为异步方法，需传 `url`、`timeout`，返回 `(path, size)` 元组，调用方必须显式解包。
+- **配置读取**: 统一通过 `main.py` 封装方法读取，严禁散落调用 `self.context.get_config(...)`。
+- **数据库迁移**: SQLite schema 变更必须在 `checkin/schema.py` 提供版本迁移与备份机制。
+- **主题自包含**: 签到卡主题生成必须内联 CSS/base64 字体，严禁外部网络 URL。
+- **日志规范**: 统一使用“中文事件描述 + `snake_case=value` 字段”，禁止吞掉异常。
+
+## 文档与进度纪律
+
+- 文档是改动的一部分。指令、配置、流程、数据结构或规则变更时，必须在同一 patch 中更新相关 `docs/`、`README.md` 及 schema。
+- repo-wide 约定变化时，同步更新 `AGENTS.md`（严控 100 行内）。
+- 每次开发任务在 `Progress/YYYY-MM-DD[-XX].md` 记录：需求、实现清单、状态、改动文件、问题与决策（该目录仅本地使用，不提交）。
+
+## 常用测试与检查
+
+```bash
+python -m json.tool _conf_schema.json
+python -m compileall -q main.py checkin pixiv plugin_api tests
+node --check pages/pluginCenter/app.js
+pytest -v
+```

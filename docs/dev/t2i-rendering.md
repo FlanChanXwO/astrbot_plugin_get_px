@@ -19,7 +19,7 @@ Star.html_render(tmpl, data, return_url=False, options)
 | 资产 | 模板 | 画布 | 渲染选项要点 |
 | --- | --- | --- | --- |
 | 帮助图 | `templates/checkin_help/` | 宽 1440 固定，**高随内容自适应** | `full_page` + png，**不传 clip** |
-| 签到日历 | `templates/checkin_calendar/` | 固定 1600×900 | `full_page` + `clip`，运行时 jpeg q95 |
+| 签到日历 | `templates/checkin_calendar/` | 设计画布 1600×900，输出随档位 1600/2080/2880 | `full_page` + `clip` + 档位缩放，运行时 jpeg q95 |
 | 签到卡 | `templates/checkin_themes/` | 固定尺寸 + 档位缩放 | `clip` + jpeg + `device_scale_factor_level` |
 
 约定：内容型海报（帮助图）高度自适应，新增指令图自动变高，不会被裁切；固定版式（日历、卡片）用 `clip` 钉死尺寸，尺寸约定由测试断言守护（`tests/test_checkin_help_asset.py`、`test_checkin_calendar.py`）。
@@ -80,6 +80,7 @@ from astrbot_plugin_get_px.checkin.calendar import (
     CHECKIN_CALENDAR_HEIGHT, CHECKIN_CALENDAR_WIDTH,
     build_checkin_calendar_data, get_checkin_calendar_template,
 )
+from astrbot_plugin_get_px.checkin.quality import CHECKIN_JPEG_QUALITY
 
 data = build_checkin_calendar_data(
     month="2026-08", today_key="2026-08-31",
@@ -87,7 +88,8 @@ data = build_checkin_calendar_data(
     events=[...],             # {"start","end","name","is_off_day"}
 )
 options = {
-    "full_page": True, "type": "png",
+    "full_page": True, "type": "jpeg",
+    "quality": CHECKIN_JPEG_QUALITY,
     "clip": {"x": 0, "y": 0, "width": CHECKIN_CALENDAR_WIDTH, "height": CHECKIN_CALENDAR_HEIGHT},
     "viewport": {"width": CHECKIN_CALENDAR_WIDTH, "height": CHECKIN_CALENDAR_HEIGHT},
     "animations": "disabled",

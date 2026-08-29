@@ -107,7 +107,7 @@
 | `/签到状态` | 金币、好感、连签等 | `/签到状态` |
 | `/签到日历 [YYYY-MM]` | 个人月度签到日历图 | `/签到日历 2026-08` |
 | `/签到排行 今日\|月榜\|连签\|累计` | 当前群的签到排行 | `/签到排行 月榜` |
-| `/签到商店 查看` | 加持、背景刷新、主题商品 | `/签到商店 查看` |
+| `/签到商店 查看` | 加持、背景刷新 | `/签到商店 查看` |
 | `/签到主题 查看 <编号>` | 免费主题预览 | `/签到主题 查看 1` |
 
 签到功能按平铺高频指令 + 小组组织：
@@ -165,7 +165,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | `pixiv_refresh_token` | 可选，作为 Lolicon 失败后的 Pixiv 回退 |
 | `image_quality` | 省流量用 `large`，优先原图用 `original` |
 | `forward_threshold` | 仅 aiocqhttp：`0` 始终合并转发；`1` 表示超过 1 张图才合并转发 |
-| `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致` |
+| `checkin_card_quality_tier` | 默认 `省流量`；日常推荐 `清晰`，高分辨率显示可选 `极致`；签到卡与日历完全同档（省流量 1600×900、清晰 2080×1170、极致 2880×1620） |
 | `dedupe_days` | 默认 `1`；需要跨日避免重复时可设为 `2–7`，`0` 为关闭 |
 | `lolicon_image_proxy_origins` | 图片地址无法访问时再配置；每行一个 http(s) origin |
 | `auto_trigger_enabled` | 需要「来张图」时再开 |
@@ -195,7 +195,7 @@ AstrBot WebUI 插件页的「pluginCenter」可：
 | `checkin_background_tag` | 签到背景标签；留空时 Lolicon 随机取图，失败后使用 Pixiv 推荐作品 | 空 |
 | `checkin_custom_background` | 本地图片路径；默认主题按竖向作品相框完整显示 | 空 |
 | `checkin_avatar_enabled` | 签到卡片显示用户头像 | `true` |
-| `checkin_card_quality_tier` | 签到卡画质：`省流量` / `清晰` / `极致`；预览和刷新背景立即生效，普通重复签到保持当天档位 | `省流量` |
+| `checkin_card_quality_tier` | 签到卡画质：`省流量` / `清晰` / `极致`；签到日历输出分辨率与背景画质完全跟随该档位；预览和刷新背景立即生效，普通重复签到保持当天档位 | `省流量` |
 | `checkin_greeting_mode` | 签到问候来源：`local` / `hitokoto` / `ai` | `hitokoto` |
 | `checkin_hitokoto_categories` | 一言类型中文多选；选择”全部”或留空时从全部分类随机 | `全部` |
 | `checkin_ai_greeting_provider_id` | 签到问候文本模型；留空时尝试当前会话模型，仍不可用则使用本地文案 | 空 |

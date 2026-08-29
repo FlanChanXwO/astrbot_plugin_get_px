@@ -74,10 +74,10 @@
 
 ## 渲染与管线（不变部分）
 
-- 画布固定 1600×900；`html_render` 输出 JPEG，`quality=CHECKIN_JPEG_QUALITY`，`clip/viewport` 1600×900，`animations="disabled"`。
+- 设计画布 1600×900（clip/viewport 恒定）；输出分辨率随签到卡 `checkin_card_quality_tier` 档位缩放：省流量 1600×900、清晰 2080×1170（high）、极致 2880×1620（ultra），尺寸表见 `checkin/calendar.py:CALENDAR_OUTPUT_SIZES`；`html_render` 输出 JPEG `quality=CHECKIN_JPEG_QUALITY`，`animations="disabled"`。
 - 无 JS：任何关键信息不得只在 hover/动画态可见。
-- 背景管线：`_fetch_source_candidates(aspect_ratio="gt1.7lt1.8")` 端上筛 16:9 邻域横图 + 本地 16:9±0.1 复核，只读去重不 claim；下载后转 data URL 内联；失败降级无图兜底。
-- 缓存：复用 `CheckinCardCache`，`CALENDAR_TEMPLATE_VERSION` 键区分；模板或样式每次改动递增 `checkin/calendar.py` 的 `CALENDAR_TEMPLATE_VERSION`（目前 `"calendar:1"`），使旧缓存图失效强制重渲。缓存 key 的 `view_model` 除 `{"month": ...}` 外还含自定义事件指纹（`events: "数量-最大ID"`，`checkin/commands.py:_calendar_custom_events_fingerprint`），管理员当日增删自定义事件后缓存即失效重渲。
+- 背景管线：`_fetch_source_candidates(aspect_ratio="gt1.7lt1.8")` 端上筛 16:9 邻域横图 + 本地 16:9±0.1 复核，只读去重不 claim；下载画质跟随签到卡 `checkin_card_quality_tier` 档位（省流量=medium、清晰/极致=large，两源已在下载器归一化，不按来源区分）；下载后转 data URL 内联；失败降级无图兜底。
+- 缓存：复用 `CheckinCardCache`，`CALENDAR_TEMPLATE_VERSION` 键区分；模板或样式每次改动递增 `checkin/calendar.py` 的 `CALENDAR_TEMPLATE_VERSION`（目前 `"calendar:1"`），使旧缓存图失效强制重渲。缓存 key 的 `view_model` 除 `{"month": ...}` 外还含自定义事件指纹（`events: "数量-最大ID"`，`checkin/commands.py:_calendar_custom_events_fingerprint`），管理员当日增删自定义事件后缓存即失效重渲；`view_model` 另含当月记录摘要、`background_quality` 与 `output_size`（随档位缩放，缓存读写按其校验尺寸），当日签到或切换画质档位后同样立即重渲。
 - `events` 归一化规则、模板视觉、字段契约任一变化，必须同步本文件与 `docs/superpowers/specs/2026-08-29-checkin-calendar-design.md`。输出的 `events[].name` 经 `html.escape()`（端点 Jinja2 无 autoescape），事件名变化规则变更时同步 `tests/test_checkin_calendar.py` 的转义回归。
 
 ## 验收点（合并后必查）

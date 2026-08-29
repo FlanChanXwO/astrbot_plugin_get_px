@@ -288,10 +288,19 @@ class _KeyCapturingCache(_CalendarCache):
     def __init__(self, published: Path | None = None):
         super().__init__(hit=None, published=published)
         self.view_models: list[dict] = []
+        self.sizes: list[tuple[int, int]] = []
 
     def cache_key(self, *, date_key, user_id, template_version, view_model) -> str:
         self.view_models.append(dict(view_model))
         return "stub:key"
+
+    def get(self, date_key, key, *, expected_size):
+        self.sizes.append(tuple(expected_size))
+        return self.hit
+
+    async def store(self, date_key, key, renderer, *, expected_size):
+        self.sizes.append(tuple(expected_size))
+        return await super().store(date_key, key, renderer, expected_size=expected_size)
 
 
 class _StoreWithoutEventSource(_CalendarStore):
@@ -323,6 +332,24 @@ def test_render_calendar_calls_html_render_with_fixed_jpeg_canvas() -> None:
         "viewport": {"width": 1600, "height": 900},
         "animations": "disabled",
     }
+
+
+def test_render_calendar_scales_output_by_render_tier() -> None:
+    plugin = object.__new__(GetPxPlugin)
+    plugin.html_render = AsyncMock(return_value="calendar.jpg")
+
+    result = asyncio.run(
+        plugin._render_checkin_calendar(
+            month="2026-08", today_key="2026-08-15", records=[], render_tier="极致"
+        )
+    )
+
+    assert result == "calendar.jpg"
+    options = plugin.html_render.await_args.kwargs["options"]
+    # 设计画布恒定 1600×900，输出缩放交给端点 device_scale_factor
+    assert options["device_scale_factor_level"] == "ultra"
+    assert options["clip"] == {"x": 0, "y": 0, "width": 1600, "height": 900}
+    assert options["viewport"] == {"width": 1600, "height": 900}
 
 
 def test_render_calendar_inlines_background_as_data_url(tmp_path, monkeypatch) -> None:
@@ -536,7 +563,15 @@ def test_calendar_cache_key_reflects_custom_event_fingerprint(tmp_path) -> None:
 
     # 管理员增删自定义事件后指纹变化，当日缓存即失效重渲
     assert output == []
-    assert cache.view_models == [{"month": "2026-08", "events": "1-7"}]
+    assert cache.view_models == [
+        {
+            "month": "2026-08",
+            "events": "1-7",
+            "records": "",
+            "background_quality": "medium",
+            "output_size": "1600x900",
+        }
+    ]
     assert len(event.sent) == 1
 
 
@@ -557,4 +592,162 @@ def test_calendar_cache_key_fingerprint_blank_without_event_source(tmp_path) -> 
     output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
 
     assert output == []
-    assert cache.view_models == [{"month": "2026-08", "events": ""}]
+    assert cache.view_models == [
+        {
+            "month": "2026-08",
+            "events": "",
+            "records": "",
+            "background_quality": "medium",
+            "output_size": "1600x900",
+        }
+    ]
+
+
+def test_calendar_background_quality_follows_render_tier(tmp_path) -> None:
+    rendered = tmp_path / "rendered.jpg"
+    _make_jpeg(rendered, size=(1600, 900))
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {"checkin_enabled": True, "checkin_card_quality_tier": "清晰"}
+    plugin.checkin_store = _CalendarStore(records=[])
+    cache = _KeyCapturingCache(published=rendered)
+    plugin.checkin_cache = cache
+    plugin._prepare_checkin_calendar_background = AsyncMock(
+        return_value=CardBackground(mode="fallback", source="fallback")
+    )
+    plugin._render_checkin_calendar = AsyncMock(return_value=str(rendered))
+    event = _FakeEvent()
+
+    output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
+
+    # 档位映射与签到卡一致：清晰/极致 → large 背景；质量参与缓存 key 换档即重渲
+    assert output == []
+    assert cache.view_models == [
+        {
+            "month": "2026-08",
+            "events": "0-0",
+            "records": "",
+            "background_quality": "large",
+            "output_size": "2080x1170",
+        }
+    ]
+    assert plugin._prepare_checkin_calendar_background.await_args.kwargs[
+        "background_quality"
+    ] == "large"
+
+
+def test_calendar_cache_expected_size_follows_tier(tmp_path) -> None:
+    rendered = tmp_path / "rendered.jpg"
+    _make_jpeg(rendered, size=(2880, 1620))
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {"checkin_enabled": True, "checkin_card_quality_tier": "极致"}
+    plugin.checkin_store = _CalendarStore(records=[])
+    cache = _KeyCapturingCache(published=rendered)
+    plugin.checkin_cache = cache
+    plugin._prepare_checkin_calendar_background = AsyncMock(
+        return_value=CardBackground(mode="fallback", source="fallback")
+    )
+    plugin._render_checkin_calendar = AsyncMock(return_value=str(rendered))
+    event = _FakeEvent()
+
+    output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
+
+    # 缓存读写按档位输出尺寸校验；清晰与极致背景同为 large，靠 output_size 区分缓存键
+    assert output == []
+    assert cache.sizes == [(2880, 1620), (2880, 1620)]
+    assert cache.view_models[-1]["output_size"] == "2880x1620"
+
+
+def test_prepare_calendar_background_downloads_requested_quality(
+    tmp_path, monkeypatch
+) -> None:
+    image = tmp_path / "bg.jpg"
+    _make_jpeg(image, size=(1600, 900))
+    illust = {"id": "123", "title": "夜樱", "user": {"name": "画师"}}
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {}
+    plugin.image_index = None
+    plugin.downloader = type("Downloader", (), {})()
+    plugin.downloader.download_for_send = AsyncMock(
+        return_value=(str(image), "large", 1234)
+    )
+    plugin._fetch_source_candidates = AsyncMock(
+        return_value=([illust], 1, "lolicon:test")
+    )
+    plugin._filter_blacklisted_illusts = AsyncMock(
+        side_effect=lambda illusts: list(illusts)
+    )
+    plugin._blacklist_reason_for_illust = AsyncMock(return_value="")
+    monkeypatch.setattr(
+        artwork_mod,
+        "filter_illusts_by_aspect_ratio",
+        lambda illusts, *args, **kwargs: list(illusts),
+    )
+    event = _FakeEvent()
+
+    background = asyncio.run(
+        plugin._prepare_checkin_calendar_background(
+            event, user_id="10001", background_quality="large"
+        )
+    )
+
+    assert background is not None and background.mode == "pixiv_daily"
+    assert plugin.downloader.download_for_send.await_args.args[1] == "large"
+
+
+def test_calendar_cache_key_reflects_month_record_state(tmp_path) -> None:
+    rendered = tmp_path / "rendered.jpg"
+    _make_jpeg(rendered, size=(1600, 900))
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {"checkin_enabled": True}
+    plugin.checkin_store = _CalendarStore(records=[_record("2026-08-02", 60)])
+    cache = _KeyCapturingCache(published=rendered)
+    plugin.checkin_cache = cache
+    plugin._prepare_checkin_calendar_background = AsyncMock(
+        return_value=CardBackground(mode="fallback", source="fallback")
+    )
+    plugin._render_checkin_calendar = AsyncMock(return_value=str(rendered))
+    event = _FakeEvent()
+
+    output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
+
+    # 当月签到记录摘要进入缓存键：当日签到后重看日历不再命中旧图
+    assert output == []
+    assert cache.view_models == [
+        {
+            "month": "2026-08",
+            "events": "0-0",
+            "records": "2026-08-02:60",
+            "background_quality": "medium",
+            "output_size": "1600x900",
+        }
+    ]
+
+
+class _FailingEventStore(_CalendarStore):
+    async def list_global_events(self):
+        raise RuntimeError("db down")
+
+
+def test_collect_calendar_raw_events_degrades_when_global_events_fail() -> None:
+    degraded = object.__new__(GetPxPlugin)
+    degraded.checkin_store = _FailingEventStore(records=[])
+    healthy = object.__new__(GetPxPlugin)
+    healthy.checkin_store = _CalendarStore(records=[])
+
+    # 全局事件读库失败按空事件降级，与无自定义事件的结果一致，不抛异常
+    assert asyncio.run(degraded._collect_calendar_raw_events("2026-08")) == (
+        asyncio.run(healthy._collect_calendar_raw_events("2026-08"))
+    )
+
+
+def test_calendar_data_escapes_background_credit_markup() -> None:
+    # 背景署名来自 Pixiv 抓取文案，t2i 端点 Jinja2 不开 autoescape，出模块前必须转义
+    data = build_checkin_calendar_data(
+        month="2026-08",
+        today_key="2026-08-15",
+        records=[],
+        background_credit='<b>画师</b> & "夜樱"',
+    )
+    assert data["background_credit"] == (
+        "&lt;b&gt;画师&lt;/b&gt; &amp; &quot;夜樱&quot;"
+    )

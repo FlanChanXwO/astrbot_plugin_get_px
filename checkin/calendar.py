@@ -26,6 +26,20 @@ CHECKIN_CALENDAR_WIDTH = 1600
 CHECKIN_CALENDAR_HEIGHT = 900
 CALENDAR_TEMPLATE_VERSION = "calendar:1"
 CALENDAR_EVENT_LIMIT = 6
+# 设计画布固定 1600×900（模板/契约锚点）；输出分辨率按签到卡画质档位缩放，
+# 倍率与签到卡 scale_level 一致（None=1.0、high=1.3、ultra=1.8）。
+CALENDAR_OUTPUT_SIZES: dict[str, tuple[int, int]] = {
+    "省流量": (1600, 900),
+    "清晰": (2080, 1170),
+    "极致": (2880, 1620),
+}
+
+
+def calendar_output_size(tier_name: str) -> tuple[int, int]:
+    try:
+        return CALENDAR_OUTPUT_SIZES[tier_name]
+    except KeyError as exc:
+        raise ValueError(f"unknown calendar render tier: {tier_name!r}") from exc
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "checkin_calendar"
 _FONT_PATH = (

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import closing
+from dataclasses import replace
 from datetime import date, timedelta
 import math
 import re
@@ -365,12 +366,13 @@ class RecordStoreMixin:
                     (remaining, now, user_id),
                 )
                 conn.commit()
+                # 提交后不得再回读档案：回读一旦失败会被调用方误报为“本次不扣费”。
+                updated_profile = replace(profile, coins=remaining)
             except Exception:
                 conn.rollback()
                 raise
-        updated = self._get_or_create_profile_sync(user_id)
         return CoinSpendResult(
-            success=True, profile=updated, cost=cost, message="扣费成功"
+            success=True, profile=updated_profile, cost=cost, message="扣费成功"
         )
 
     async def update_record_content(

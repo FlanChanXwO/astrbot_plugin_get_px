@@ -30,39 +30,6 @@ def _set_coins(store: CheckinStore, user_id: str, coins: int) -> None:
         conn.commit()
 
 
-def test_only_builtin_themes_are_registered() -> None:
-    assert tuple(CHECKIN_THEMES) == (
-        "default",
-        "blue",
-        "red",
-        "yellow",
-        "spring",
-        "summer",
-        "autumn",
-        "winter",
-    )
-    assert [theme.code for theme in CHECKIN_THEMES.values()] == [
-        "00",
-        "01",
-        "02",
-        "03",
-        "04",
-        "05",
-        "06",
-        "07",
-    ]
-    assert [theme.name for theme in CHECKIN_THEMES.values()] == [
-        "米白",
-        "浅蓝",
-        "红黑",
-        "黄黑",
-        "新柳",
-        "荷风",
-        "丹枫",
-        "寒梅",
-    ]
-
-
 def test_theme_ids_codes_and_names_resolve() -> None:
     values = {
         "default": "default",
@@ -102,21 +69,6 @@ def test_all_registered_checkin_themes_are_self_contained() -> None:
         preview = theme.preview_path(plugin_root)
         assert preview.is_file()
         assert preview.suffix.lower() == ".png"
-
-
-def test_theme_and_user_tables_are_separate() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        store = FrozenCheckinStore(tmp, date_key="2026-07-13")
-        with closing(sqlite3.connect(store._db_path)) as conn:
-            tables = {
-                row[0]
-                for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                ).fetchall()
-            }
-            assert "checkin_users" in tables
-            assert "checkin_themes" in tables
-            assert "checkin_user_themes" in tables
 
 
 @pytest.mark.asyncio

@@ -879,9 +879,17 @@ class CheckinArtworkMixin:
         )
 
     async def _prepare_checkin_calendar_background(
-        self, event: AstrMessageEvent, *, user_id: str
+        self,
+        event: AstrMessageEvent,
+        *,
+        user_id: str,
+        background_quality: str = "medium",
     ) -> CardBackground | None:
-        """为日历取一张 16:9 邻域横图氛围背景；不占去重池，失败按无图兜底。"""
+        """为日历取一张 16:9 邻域横图氛围背景；不占去重池，失败按无图兜底。
+
+        ``background_quality`` 跟随签到卡画质档位（省流量=medium、清晰/极致=large）；
+        两源在下载器内已归一化到同一质量枚举，无需按来源区分。
+        """
         try:
             illusts, _raw_count, source_key = await self._fetch_source_candidates(
                 event, "", count=20, aspect_ratio=_CALENDAR_BG_ASPECT_PARAM,
@@ -930,7 +938,7 @@ class CheckinArtworkMixin:
             try:
                 path, actual_q, file_size = await self.downloader.download_for_send(
                     illust,
-                    "medium",
+                    background_quality,
                     timeout=timeout_sec,
                     downgrade_limit_bytes=0,
                     log_context=f"[日历背景] 作品 {illust_id}",
@@ -966,41 +974,53 @@ class CheckinArtworkMixin:
         records,
         background: CardBackground | None = None,
         events=(),
+        render_tier: str | None = None,
     ) -> str:
         background_credit = ""
         if background is not None and getattr(background, "illust_id", ""):
             background_credit = getattr(background, "pixiv_caption", "") or ""
+        # 读文件 + PIL 校验 + base64 可达数 MB，与视图组装一并放进线程池
+        background_url = await asyncio.to_thread(
+            _file_to_data_url,
+            str(getattr(background, "image_path", "") or ""),
+        )
         data = await asyncio.to_thread(
             build_checkin_calendar_data,
             month=month,
             today_key=today_key,
             records=records,
-            background_url=_file_to_data_url(
-                getattr(background, "image_path", "") or ""
-            ),
+            background_url=background_url,
             background_credit=background_credit,
             events=events,
         )
+        # 与签到卡同一缩放语义：clip/viewport 恒为设计画布 1600×900，
+        # 输出分辨率由端点 device_scale_factor 决定（省流量无缩放、清晰 1.3x、极致 1.8x）
+        render_spec = get_checkin_render_tier(
+            render_tier or DEFAULT_CHECKIN_RENDER_TIER
+        )
+        options = {
+            "full_page": True,
+            "type": "jpeg",
+            "quality": CHECKIN_JPEG_QUALITY,
+            "clip": {
+                "x": 0,
+                "y": 0,
+                "width": CHECKIN_CALENDAR_WIDTH,
+                "height": CHECKIN_CALENDAR_HEIGHT,
+            },
+            "viewport": {
+                "width": CHECKIN_CALENDAR_WIDTH,
+                "height": CHECKIN_CALENDAR_HEIGHT,
+            },
+            "animations": "disabled",
+        }
+        if render_spec.scale_level is not None:
+            options["device_scale_factor_level"] = render_spec.scale_level
         return await self.html_render(
             get_checkin_calendar_template(),
             data,
             return_url=False,
-            options={
-                "full_page": True,
-                "type": "jpeg",
-                "quality": CHECKIN_JPEG_QUALITY,
-                "clip": {
-                    "x": 0,
-                    "y": 0,
-                    "width": CHECKIN_CALENDAR_WIDTH,
-                    "height": CHECKIN_CALENDAR_HEIGHT,
-                },
-                "viewport": {
-                    "width": CHECKIN_CALENDAR_WIDTH,
-                    "height": CHECKIN_CALENDAR_HEIGHT,
-                },
-                "animations": "disabled",
-            },
+            options=options,
         )
 
     async def _checkin_background_used_ids(

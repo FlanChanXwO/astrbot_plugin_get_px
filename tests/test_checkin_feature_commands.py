@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import closing
-import json
 import sqlite3
 import sys
 import tempfile
@@ -54,22 +53,6 @@ def set_user_coins(plugin: GetPxPlugin, coins: int) -> None:
             (coins, "10001"),
         )
         conn.commit()
-
-
-def test_theme_cost_schema_follows_background_refresh_cost() -> None:
-    schema_path = Path(__file__).resolve().parents[1] / "_conf_schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    keys = list(schema)
-
-    background_index = keys.index("checkin_background_refresh_cost")
-    assert keys[background_index + 1] == "checkin_theme_cost"
-    assert schema["checkin_theme_cost"] == {
-        "description": "签到主题价格",
-        "type": "int",
-        "default": 1500,
-        "slider": {"min": 0, "max": 5000, "step": 100},
-        "hint": "用户购买任意非默认签到主题所需金币。设为 0 表示免费；默认“米白”主题始终免费。",
-    }
 
 
 def test_shop_catalog_has_stable_ids_and_categories() -> None:

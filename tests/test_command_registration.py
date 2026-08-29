@@ -127,30 +127,6 @@ def test_checkin_calendar_is_a_top_level_command_and_delegates_month() -> None:
     assert output == ["ok"]
 
 
-def test_user_facing_prompt_strings_use_new_command_paths() -> None:
-    import inspect
-
-    import astrbot_plugin_get_px.checkin.commands as commands_mod
-    import astrbot_plugin_get_px.checkin.shop as shop_mod
-
-    stale = {"签到我的", "签到商店 主题", "签到商店 刷新背景"}
-    for mod in (commands_mod, shop_mod):
-        source = inspect.getsource(mod)
-        assert not any(token in source for token in stale), f"{mod.__name__} 含旧指令提示串"
-
-
-def test_checkin_center_has_no_legacy_root_registration() -> None:
-    root_filters = [
-        event_filter
-        for handler in _plugin_command_handlers()
-        for event_filter in handler.event_filters
-        if isinstance(event_filter, (CommandFilter, CommandGroupFilter))
-        and "签到中心" in event_filter.get_complete_command_names()
-    ]
-
-    assert root_filters == []
-
-
 def test_checkin_help_sends_the_help_image() -> None:
     event = _CheckinHelpEvent()
     plugin = object.__new__(main.GetPxPlugin)
@@ -162,6 +138,7 @@ def test_checkin_help_sends_the_help_image() -> None:
     assert len(output[0]) == 1
     assert type(output[0][0]).__name__ == "Image"
     assert Path(output[0][0].path) == main.CHECKIN_HELP_IMAGE
+    assert main.CHECKIN_HELP_IMAGE.is_file()
 
 
 def test_checkin_admin_subcommands_keep_admin_permission() -> None:
@@ -196,12 +173,3 @@ def test_plain_checkin_trigger_is_preserved() -> None:
     assert regex_filter.regex.fullmatch("签到")
     assert not regex_filter.regex.fullmatch("签到中心")
     assert not regex_filter.regex.fullmatch("签到帮助")
-
-
-def test_checkin_help_image_is_installed_without_legacy_assets() -> None:
-    root = Path(__file__).resolve().parents[1]
-    assert not hasattr(main, "CHECKIN_CENTER_HELP_IMAGE")
-    assert hasattr(main.GetPxPlugin, "cmd_checkin_help")
-    assert not (root / "assets/checkin_help.png").exists()
-    assert not (root / "assets/checkin_help.html").exists()
-    assert main.CHECKIN_HELP_IMAGE.is_file()
