@@ -52,6 +52,41 @@ class RacingCheckinStore(FrozenCheckinStore):
 
 
 class CheckinStoreTest(unittest.IsolatedAsyncioTestCase):
+    async def test_list_month_records_returns_only_target_month_in_date_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FrozenCheckinStore(tmp, date_key="2026-07-31")
+            await store.checkin(user_id="10001", username="Alice", bot_name="neko")
+            store.date_key = "2026-08-02"
+            await store.checkin(user_id="10001", username="Alice", bot_name="neko")
+            store.date_key = "2026-08-05"
+            await store.checkin(user_id="10001", username="Alice", bot_name="neko")
+
+            records = await store.list_month_records(user_id="10001", month="2026-08")
+
+            self.assertEqual(
+                [record.date_key for record in records],
+                ["2026-08-02", "2026-08-05"],
+            )
+
+    async def test_list_month_records_accepts_empty_user_without_creating_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FrozenCheckinStore(tmp, date_key="2026-08-05")
+
+            records = await store.list_month_records(user_id="", month="2026-08")
+
+            self.assertEqual(records, [])
+            self.assertIsNone(await store.find_profile(""))
+
+    async def test_list_month_records_rejects_invalid_and_future_months(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FrozenCheckinStore(tmp, date_key="2026-08-05")
+            for month in (
+                "", "2026-8", "2026-13", "2026-02-30", "2026-08-01", "2026/08", "2026-09"
+            ):
+                with self.subTest(month=month):
+                    with self.assertRaisesRegex(ValueError, "month"):
+                        await store.list_month_records(user_id="10001", month=month)
+
     async def test_unversioned_nonempty_database_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             database_path = Path(tmp) / "checkin.sqlite3"

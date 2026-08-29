@@ -4,6 +4,7 @@ import asyncio
 from contextlib import closing
 from datetime import date, timedelta
 import math
+import re
 import sqlite3
 
 from .models import (
@@ -57,7 +58,48 @@ _MEMBER_SELECT = """
 """
 
 
+def _month_bounds(month: str, *, current_month: str) -> tuple[str, str]:
+    """把 YYYY-MM 校验为目标月首日到下月首日的半开区间；非法或未来月报错。"""
+    if not isinstance(month, str) or re.fullmatch(r"\d{4}-\d{2}", month) is None:
+        raise ValueError("month must use YYYY-MM")
+    try:
+        start = date.fromisoformat(f"{month}-01")
+    except ValueError as exc:
+        raise ValueError("month must use YYYY-MM") from exc
+    if month > current_month:
+        raise ValueError("month must not be in the future")
+    end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+    return start.isoformat(), end.isoformat()
+
+
 class RecordStoreMixin:
+    async def list_month_records(
+        self, *, user_id: str, month: str
+    ) -> list[CheckinRecord]:
+        """只返回目标月内的签到记录，按日期升序；空用户不建档。"""
+        user_id = str(user_id or "")
+        start, end = _month_bounds(
+            str(month or ""), current_month=self.today_key()[:7]
+        )
+        if not user_id:
+            return []
+        async with self._lock:
+            return await asyncio.to_thread(self._list_month_records_sync, user_id, start, end)
+
+    def _list_month_records_sync(
+        self, user_id: str, start: str, end: str
+    ) -> list[CheckinRecord]:
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM checkin_records
+                WHERE user_id = ? AND date_key >= ? AND date_key < ?
+                ORDER BY date_key ASC
+                """,
+                (user_id, start, end),
+            ).fetchall()
+        return [self._row_to_record(row) for row in rows]
+
     async def find_profile(self, user_id: str) -> CheckinProfile | None:
         user_id = str(user_id or "")
         if not user_id:

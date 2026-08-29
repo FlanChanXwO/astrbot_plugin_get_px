@@ -106,6 +106,27 @@ def test_checkin_command_groups_expose_focused_groups() -> None:
     assert "checkin_my" not in group_names
 
 
+def test_checkin_calendar_is_a_top_level_command_and_delegates_month() -> None:
+    paths = _registered_command_paths()
+    assert "签到日历" in paths
+
+    plugin = object.__new__(main.GetPxPlugin)
+    calls: list[tuple[str, ...]] = []
+
+    async def _fake_handler(event, month: str = ""):
+        calls.append((month,))
+        yield event.plain_result("ok")
+
+    plugin._handle_checkin_calendar = _fake_handler
+    event = _CheckinHelpEvent()
+
+    output = asyncio.run(_collect(plugin.cmd_checkin_calendar(event, "2026-08")))
+
+    assert event.stopped
+    assert calls == [("2026-08",)]
+    assert output == ["ok"]
+
+
 def test_user_facing_prompt_strings_use_new_command_paths() -> None:
     import inspect
 

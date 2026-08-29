@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from datetime import date, timedelta
 from pathlib import Path
@@ -9,6 +10,17 @@ import time
 from astrbot.api.all import File, Image, Plain, logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.core.star.star_tools import StarTools
+
+from .calendar import (
+    CALENDAR_TEMPLATE_VERSION,
+    CHECKIN_CALENDAR_HEIGHT,
+    CHECKIN_CALENDAR_WIDTH,
+    collect_calendar_events,
+)
+try:
+    from ..pixiv.downloader import cleanup
+except ImportError:  # Direct imports used by the test suite.
+    from pixiv.downloader import cleanup
 
 from .models import (
     ACHIEVEMENTS,
@@ -610,6 +622,143 @@ class CheckinCommandMixin:
         except ValueError as exc:
             return str(exc)
         return f"已添加事件 #{item.event_id}: {item.date_value} {item.name}"
+
+    async def _handle_checkin_calendar(
+        self, event: AstrMessageEvent, month: str = ""
+    ):
+        if not self._cfg_bool("checkin_enabled", True):
+            yield event.plain_result("签到功能已关闭")
+            return
+        if self.checkin_store is None:
+            yield event.plain_result("签到数据尚未初始化，请稍后再试")
+            return
+        user_id = str(event.get_sender_id() or "")
+        if not user_id:
+            yield event.plain_result("无法识别用户 ID，暂时不能查看签到日历")
+            return
+        target_month = str(month or "").strip() or CheckinStore.today_key()[:7]
+        try:
+            records = await self.checkin_store.list_month_records(
+                user_id=user_id, month=target_month
+            )
+        except ValueError:
+            yield event.plain_result(
+                "月份格式应为 YYYY-MM，例如：签到日历 2026-08；暂不支持查看未来月份"
+            )
+            return
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 查询签到日历失败: month={target_month} "
+                f"error_type={type(exc).__name__}"
+            )
+            yield event.plain_result("读取签到日历失败，请稍后再试")
+            return
+
+        today_key = CheckinStore.today_key()
+        cache = getattr(self, "checkin_cache", None)
+        calendar_path = ""
+        directly_rendered = False
+        background: CardBackground | None = None
+        try:
+            if cache is not None:
+                key = cache.cache_key(
+                    date_key=today_key,
+                    user_id=user_id,
+                    template_version=CALENDAR_TEMPLATE_VERSION,
+                    view_model={"month": target_month},
+                )
+                calendar_path = str(
+                    cache.get(
+                        today_key,
+                        key,
+                        expected_size=(CHECKIN_CALENDAR_WIDTH, CHECKIN_CALENDAR_HEIGHT),
+                    )
+                    or ""
+                )
+            if not calendar_path:
+                # 缓存命中时不取背景、不渲染；未命中才取一张氛围背景（失败降级无图）。
+                try:
+                    background = await self._prepare_checkin_calendar_background(
+                        event, user_id=user_id
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        f"{LOG_PREFIX} 日历背景获取失败，使用无图兜底: "
+                        f"error_type={type(exc).__name__}"
+                    )
+                    background = None
+                raw_events = await self._collect_calendar_raw_events(target_month)
+
+                def renderer():
+                    return self._render_checkin_calendar(
+                        month=target_month,
+                        today_key=today_key,
+                        records=records,
+                        background=background,
+                        events=raw_events,
+                    )
+
+                if cache is not None:
+                    calendar_path = str(
+                        await cache.store(
+                            today_key,
+                            key,
+                            renderer,
+                            expected_size=(
+                                CHECKIN_CALENDAR_WIDTH,
+                                CHECKIN_CALENDAR_HEIGHT,
+                            ),
+                        )
+                    )
+                else:
+                    directly_rendered = True
+                    calendar_path = await renderer()
+            if not calendar_path:
+                raise RuntimeError("calendar renderer returned empty path")
+            await event.send(
+                event.chain_result([Image.fromFileSystem(str(calendar_path))])
+            )
+            logger.info(
+                f"{LOG_PREFIX} 签到日历发送完成: month={target_month} "
+                f"record_count={len(records)} "
+                f"cached={'no' if directly_rendered else 'yes'} "
+                f"background_mode={getattr(background, 'mode', 'none') or 'none'}"
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 签到日历渲染或发送失败: month={target_month} "
+                f"error_type={type(exc).__name__}"
+            )
+            yield event.plain_result("签到日历生成失败，请稍后再试")
+        finally:
+            if directly_rendered and calendar_path:
+                cleanup(str(calendar_path))
+            if (
+                background is not None
+                and background.image_path
+                and background.mode == "pixiv_daily"
+            ):
+                cleanup(background.image_path)
+
+    async def _collect_calendar_raw_events(self, target_month: str):
+        holiday_cal = getattr(self, "holiday_calendar", None)
+        custom_events = ()
+        list_events = getattr(self.checkin_store, "list_global_events", None)
+        if callable(list_events):
+            custom_events = tuple(await list_events())
+        try:
+            return await asyncio.to_thread(
+                collect_calendar_events,
+                month=target_month,
+                holiday_lookup=(holiday_cal.lookup if holiday_cal is not None else None),
+                custom_events=custom_events,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 日历事件收集失败，事件条留空: "
+                f"month={target_month} error_type={type(exc).__name__}"
+            )
+            return []
 
     @staticmethod
     def _format_checkin_plain_text(result) -> str:

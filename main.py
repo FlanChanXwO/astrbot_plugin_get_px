@@ -21,6 +21,7 @@
     /签到主题                  签到主题列表、查看、购买与切换
     /签到管理                  签到管理功能（仅管理员）
     刷新背景                   花费金币重新抽取今天的签到背景
+    签到日历 [YYYY-MM]         查看个人月度签到日历（默认当月）
 """
 
 # 注意：不要在本模块使用 `from __future__ import annotations`。
@@ -511,6 +512,13 @@ class GetPxPlugin(
         """花费金币重新抽取今天的签到背景。"""
         event.stop_event()
         async for result in self._handle_refresh_checkin_background(event):
+            yield result
+
+    @filter.command("签到日历")
+    async def cmd_checkin_calendar(self, event: AstrMessageEvent, month: str = ""):
+        """查看自己的月度签到日历。参数: [YYYY-MM]"""
+        event.stop_event()
+        async for result in self._handle_checkin_calendar(event, month):
             yield result
 
     @filter.command_group("签到管理")

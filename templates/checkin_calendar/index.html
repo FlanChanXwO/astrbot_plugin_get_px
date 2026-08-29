@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <style>/*__CHECKIN_CALENDAR_CSS__*/</style>
+</head>
+<body>
+  <main class="stage">
+    <!-- 背景层：高清原图无模糊，左侧仅施加柔和渐变过渡 -->
+    <div class="background-layer" aria-hidden="true">
+      {% if background_url %}
+      <img class="bg-image" src="{{ background_url }}" alt="" />
+      {% else %}
+      <div class="bg-fallback"></div>
+      {% endif %}
+      <div class="bg-gradient-scrim"></div>
+    </div>
+
+    <!-- 主界面：左侧集成式通透日历面板，右侧大面积留白展示插画 -->
+    <div class="content-container">
+      <aside class="glass-calendar-card">
+        <!-- 头部：月份与核心统计 -->
+        <header class="card-header">
+          <div class="title-group">
+            <h1 class="month-title">{{ month_label }}</h1>
+            <span class="as-of-text">截至 {{ as_of_date }}</span>
+          </div>
+          <div class="stats-rows">
+            <div class="stat-row">
+              <span class="stat-label"><i class="row-dot" aria-hidden="true"></i>已签到</span>
+              <strong class="stat-value">{{ checked_days }} 天</strong>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">
+                <span class="coin-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" width="17" height="17" role="img">
+                    <defs>
+                      <radialGradient id="coinGold" cx="35%" cy="30%" r="80%">
+                        <stop offset="0%" stop-color="#eed492" />
+                        <stop offset="55%" stop-color="#d5a442" />
+                        <stop offset="100%" stop-color="#9c6408" />
+                      </radialGradient>
+                    </defs>
+                    <circle cx="10" cy="10" r="8.8" fill="url(#coinGold)" stroke="#8a5a06" stroke-width="1.2" />
+                    <circle cx="10" cy="10" r="6" fill="none" stroke="rgba(138, 90, 6, 0.5)" stroke-width="0.8" />
+                    <rect x="7.9" y="7.9" width="4.2" height="4.2" rx="0.9" fill="#f6ead0" stroke="#8a5a06" stroke-width="0.9" />
+                  </svg>
+                </span>
+                获得金币
+              </span>
+              <strong class="stat-value gold">+{{ coins_earned }}</strong>
+            </div>
+          </div>
+        </header>
+
+        <!-- 日历主体：去方框化、精炼数字矩阵 -->
+        <section class="calendar-body">
+          <div class="week-header">
+            {% for label in ["一", "二", "三", "四", "五", "六", "日"] %}
+            <span class="week-day-label">{{ label }}</span>
+            {% endfor %}
+          </div>
+          <div class="days-grid">
+            {% for week in weeks %}
+            <div class="week-row">
+              {% for cell in week %}
+              <div class="day-cell {{ cell.state }}{% if cell.date_key == today_key %} today{% endif %}">
+                {% if cell.state != "outside" %}
+                  <div class="cell-inner">
+                    <span class="day-number">{{ cell.day }}</span>
+                    {% if cell.state == "checked" %}
+                      <span class="coins-badge">{{ cell.coins_label }}</span>
+                      <i class="check-mark" aria-hidden="true">✓</i>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <!-- 底部信息：节日与署名 -->
+        <footer class="card-footer">
+          {% if events %}
+          <div class="events-bar">
+            <span class="events-tag">本月节气/节日</span>
+            <div class="events-list">
+              {% for ev in events %}
+              <span class="event-chip"><em>{{ ev.day }}日</em> {{ ev.name }}</span>
+              {% endfor %}
+              {% if events_hidden_count %}
+              <span class="event-chip more">等 {{ events_hidden_count }} 项</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          {% if empty %}
+          <div class="empty-tip">本月还没有签到记录，快去签到吧~</div>
+          {% endif %}
+        </footer>
+      </aside>
+
+      <!-- 右下角原画署名徽章 -->
+      {% if background_credit %}
+      <div class="artwork-credit-badge">
+        <span class="credit-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="15" height="15" role="img">
+            <rect x="1.6" y="1.6" width="12.8" height="12.8" rx="2.6" fill="none" stroke="#b3422e" stroke-width="1.4" />
+            <circle cx="5.7" cy="5.7" r="1.4" fill="#b3422e" />
+            <path d="M3.2 11.4 L6.6 8.1 L9 10.3 L11 8.4 L12.8 10.1" fill="none" stroke="#b3422e" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <span class="credit-text">{{ background_credit }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

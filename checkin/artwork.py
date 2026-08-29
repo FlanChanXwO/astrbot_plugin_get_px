@@ -22,10 +22,17 @@ from .card import (
     CHECKIN_CARD_HEIGHT,
     CHECKIN_CARD_WIDTH,
     CardBackground,
+    _file_to_data_url,
     build_checkin_card_data,
     get_checkin_card_template,
 )
 from .cache import is_valid_card_jpeg
+from .calendar import (
+    CHECKIN_CALENDAR_HEIGHT,
+    CHECKIN_CALENDAR_WIDTH,
+    build_checkin_calendar_data,
+    get_checkin_calendar_template,
+)
 from .quality import (
     CHECKIN_JPEG_QUALITY,
     DEFAULT_CHECKIN_RENDER_TIER,
@@ -46,6 +53,13 @@ _CHECKIN_BACKGROUND_MODE_LABELS = {
 def _checkin_background_mode_label(background: CardBackground | None) -> str:
     mode = getattr(background, "mode", "") or "none"
     return _CHECKIN_BACKGROUND_MODE_LABELS.get(str(mode), str(mode))
+
+_CALENDAR_BG_RATIO = 16 / 9
+_CALENDAR_BG_RATIO_TOLERANCE = 0.10
+# Lolicon aspectRatio 支持数值条件组合（gt/gte/lt/lte/eq）；
+# "landscape"/"portrait" 等枚举值不是合法语法，传了等于没筛。
+_CALENDAR_BG_ASPECT_PARAM = "gt1.7lt1.8"
+
 
 try:
     from ..pixiv.index import ordered_by_unused
@@ -862,6 +876,131 @@ class CheckinArtworkMixin:
             return
         await self._release_checkin_background_usage(
             event, background.source, background.illust_id
+        )
+
+    async def _prepare_checkin_calendar_background(
+        self, event: AstrMessageEvent, *, user_id: str
+    ) -> CardBackground | None:
+        """为日历取一张 16:9 邻域横图氛围背景；不占去重池，失败按无图兜底。"""
+        try:
+            illusts, _raw_count, source_key = await self._fetch_source_candidates(
+                event, "", count=20, aspect_ratio=_CALENDAR_BG_ASPECT_PARAM,
+            )
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 日历背景请求失败，使用无图兜底: "
+                f"error_type={type(exc).__name__}"
+            )
+            return CardBackground(mode="fallback", source="fallback")
+        if self._cfg_bool("filter_manga", True):
+            illusts = self._filter_manga(illusts)
+        try:
+            illusts = await self._filter_blacklisted_illusts(illusts)
+        except RuntimeError as exc:
+            logger.warning(
+                f"{LOG_PREFIX} 日历背景安全检查不可用，使用无图兜底: "
+                f"error_type={type(exc).__name__}"
+            )
+            return CardBackground(mode="fallback", source="fallback")
+        # Pixiv 回退路径不经过 API 端筛选，本地按 16:9±0.1 复核。
+        illusts = filter_illusts_by_aspect_ratio(
+            illusts, _CALENDAR_BG_RATIO, _CALENDAR_BG_RATIO_TOLERANCE
+        )
+        used_ids = set(await self._checkin_background_used_ids(event, source_key))
+        ordered = [
+            illust
+            for illust in ordered_by_unused(illusts, used_ids)
+            if str(illust.get("id") or "") not in used_ids
+        ] or illusts
+        timeout_sec = self._cfg_float("request_timeout", 30.0, 5.0, 120.0)
+        for illust in ordered[:8]:
+            illust_id = str(illust.get("id") or "")
+            if not illust_id:
+                continue
+            try:
+                reason = await self._blacklist_reason_for_illust(illust, illust_id)
+            except RuntimeError as exc:
+                logger.warning(
+                    f"{LOG_PREFIX} 日历背景安全检查不可用，跳过作品: "
+                    f"illust_id={illust_id} error_type={type(exc).__name__}"
+                )
+                continue
+            if reason:
+                continue
+            try:
+                path, actual_q, file_size = await self.downloader.download_for_send(
+                    illust,
+                    "medium",
+                    timeout=timeout_sec,
+                    downgrade_limit_bytes=0,
+                    log_context=f"[日历背景] 作品 {illust_id}",
+                )
+            except Exception as exc:
+                logger.debug(
+                    f"{LOG_PREFIX} 日历背景候选跳过: reason=download_error "
+                    f"illust_id={illust_id} error_type={type(exc).__name__}"
+                )
+                continue
+            return CardBackground(
+                image_path=path,
+                mode="pixiv_daily",
+                source=source_key,
+                illust_id=illust_id,
+                title=str(illust.get("title") or ""),
+                author=str((illust.get("user") or {}).get("name") or ""),
+                illust=illust,
+                quality=actual_q,
+                file_size=file_size,
+            )
+        logger.info(
+            f"{LOG_PREFIX} 日历背景无可用横图，使用无图兜底: "
+            f"reason=no_landscape_candidate"
+        )
+        return CardBackground(mode="fallback", source="fallback")
+
+    async def _render_checkin_calendar(
+        self,
+        *,
+        month: str,
+        today_key: str,
+        records,
+        background: CardBackground | None = None,
+        events=(),
+    ) -> str:
+        background_credit = ""
+        if background is not None and getattr(background, "illust_id", ""):
+            background_credit = getattr(background, "pixiv_caption", "") or ""
+        data = await asyncio.to_thread(
+            build_checkin_calendar_data,
+            month=month,
+            today_key=today_key,
+            records=records,
+            background_url=_file_to_data_url(
+                getattr(background, "image_path", "") or ""
+            ),
+            background_credit=background_credit,
+            events=events,
+        )
+        return await self.html_render(
+            get_checkin_calendar_template(),
+            data,
+            return_url=False,
+            options={
+                "full_page": False,
+                "type": "jpeg",
+                "quality": CHECKIN_JPEG_QUALITY,
+                "clip": {
+                    "x": 0,
+                    "y": 0,
+                    "width": CHECKIN_CALENDAR_WIDTH,
+                    "height": CHECKIN_CALENDAR_HEIGHT,
+                },
+                "viewport": {
+                    "width": CHECKIN_CALENDAR_WIDTH,
+                    "height": CHECKIN_CALENDAR_HEIGHT,
+                },
+                "animations": "disabled",
+            },
         )
 
     async def _checkin_background_used_ids(
