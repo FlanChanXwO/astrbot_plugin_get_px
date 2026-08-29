@@ -94,7 +94,7 @@ python main.py
 1. 阅读 [`../user/checkin.md`](../user/checkin.md) 了解业务规则
 2. 修改相关模块（`checkin/application.py`、`checkin/rules.py` 等）
 3. 运行相关测试：`pytest tests/test_checkin_*.py -v`
-4. 手工验证：`/签到`、`/签到我的`、`/签到商店`
+4. 手工验证：`/签到`、`/签到状态`、`/签到商店`、`/签到主题`、`/签到日历`
 
 ### 修改配置项
 

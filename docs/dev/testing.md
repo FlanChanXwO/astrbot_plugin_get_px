@@ -87,7 +87,7 @@ pytest tests/test_downloader.py -v
 pytest tests/test_checkin_*.py -v
 # 手工验证：
 # /签到
-# /签到我的
+# /签到日历
 # /签到商店
 # /签到排行
 ```
