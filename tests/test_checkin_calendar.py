@@ -199,6 +199,21 @@ def test_collect_calendar_events_pulls_solar_terms_and_custom_events() -> None:
     assert ("2026-08-29", "纪念日") in by_day
     assert not any(e.start == "2026-07-31" for e in events)
 
+
+def test_calendar_event_names_are_html_escaped() -> None:
+    data = build_checkin_calendar_data(
+        month="2026-10",
+        today_key="2026-10-01",
+        records=[],
+        events=[_event("2026-10-31", '<b>万圣节</b> & "夜"')],
+    )
+
+    # t2i 端点 Jinja2 不开 autoescape，管理员自定义事件名必须后端转义
+    assert data["events"] == [
+        {"day": 31, "name": "&lt;b&gt;万圣节&lt;/b&gt; &amp; &quot;夜&quot;"}
+    ]
+    assert data["events_hidden_count"] == 0
+
 def _make_jpeg(path: Path, size: tuple[int, int]) -> None:
     PILImage.new("RGB", size, "white").save(path, format="JPEG")
 
@@ -231,8 +246,9 @@ class _FakeEvent:
 
 
 class _CalendarStore:
-    def __init__(self, records):
+    def __init__(self, records, global_events=()):
         self.records = list(records)
+        self.global_events = tuple(global_events)
         self.calls: list[tuple[str, str]] = []
 
     async def list_month_records(self, *, user_id: str, month: str):
@@ -240,6 +256,9 @@ class _CalendarStore:
         if month != "2026-08":
             raise ValueError("month must use YYYY-MM")
         return list(self.records)
+
+    async def list_global_events(self):
+        return self.global_events
 
 
 class _CalendarCache:
@@ -263,6 +282,20 @@ class _CalendarCache:
         if asyncio.iscoroutine(result):
             await result
         return self.published
+
+
+class _KeyCapturingCache(_CalendarCache):
+    def __init__(self, published: Path | None = None):
+        super().__init__(hit=None, published=published)
+        self.view_models: list[dict] = []
+
+    def cache_key(self, *, date_key, user_id, template_version, view_model) -> str:
+        self.view_models.append(dict(view_model))
+        return "stub:key"
+
+
+class _StoreWithoutEventSource(_CalendarStore):
+    list_global_events = None  # 模拟旧版 store 无该接口
 
 
 async def _collect(async_iterable):
@@ -480,3 +513,48 @@ def test_calendar_command_returns_text_for_bad_month_render_and_send_failures(
     assert len(output) == 1
     assert "生成失败" in output[0]
     assert not rendered.exists()
+
+
+def test_calendar_cache_key_reflects_custom_event_fingerprint(tmp_path) -> None:
+    rendered = tmp_path / "rendered.jpg"
+    _make_jpeg(rendered, size=(1600, 900))
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {"checkin_enabled": True}
+    plugin.checkin_store = _CalendarStore(
+        records=[],
+        global_events=(type("Event", (), {"event_id": 7})(),),
+    )
+    cache = _KeyCapturingCache(published=rendered)
+    plugin.checkin_cache = cache
+    plugin._prepare_checkin_calendar_background = AsyncMock(
+        return_value=CardBackground(mode="fallback", source="fallback")
+    )
+    plugin._render_checkin_calendar = AsyncMock(return_value=str(rendered))
+    event = _FakeEvent()
+
+    output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
+
+    # 管理员增删自定义事件后指纹变化，当日缓存即失效重渲
+    assert output == []
+    assert cache.view_models == [{"month": "2026-08", "events": "1-7"}]
+    assert len(event.sent) == 1
+
+
+def test_calendar_cache_key_fingerprint_blank_without_event_source(tmp_path) -> None:
+    rendered = tmp_path / "rendered.jpg"
+    _make_jpeg(rendered, size=(1600, 900))
+    plugin = object.__new__(GetPxPlugin)
+    plugin.config = {"checkin_enabled": True}
+    plugin.checkin_store = _StoreWithoutEventSource(records=[])
+    cache = _KeyCapturingCache(published=rendered)
+    plugin.checkin_cache = cache
+    plugin._prepare_checkin_calendar_background = AsyncMock(
+        return_value=CardBackground(mode="fallback", source="fallback")
+    )
+    plugin._render_checkin_calendar = AsyncMock(return_value=str(rendered))
+    event = _FakeEvent()
+
+    output = asyncio.run(_collect(plugin._handle_checkin_calendar(event, "2026-08")))
+
+    assert output == []
+    assert cache.view_models == [{"month": "2026-08", "events": ""}]

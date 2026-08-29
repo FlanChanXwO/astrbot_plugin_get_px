@@ -255,6 +255,11 @@ def build_checkin_calendar_data(
     shown_events, hidden = summarize_calendar_events(
         tuple(events), month=month, today_key=today_key
     )
+    # 事件名可含管理员自定义输入；t2i 端点 Jinja2 不开 autoescape，出模块前转义
+    shown_events = [
+        {"day": item["day"], "name": escape(str(item["name"]))}
+        for item in shown_events
+    ]
     return {
         "month_label": escape(f"{year} 年 {month_num:02d} 月"),
         "checked_days": checked_days,
