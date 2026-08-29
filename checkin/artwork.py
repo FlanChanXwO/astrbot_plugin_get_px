@@ -986,7 +986,7 @@ class CheckinArtworkMixin:
             data,
             return_url=False,
             options={
-                "full_page": False,
+                "full_page": True,
                 "type": "jpeg",
                 "quality": CHECKIN_JPEG_QUALITY,
                 "clip": {

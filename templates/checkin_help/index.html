@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>签到指令图</title>
+  <style>/*__HELP_CSS__*/</style>
+</head>
+<body>
+  <main class="poster">
+    <header>
+      <div>
+        <div class="eyebrow">ASTRBOT · GET PX</div>
+        <h1>签到指令</h1>
+      </div>
+      <div class="header-right">
+        <div class="version">VER v3.6.0</div>
+        <div class="subtitle">可直接输入的完整指令一览</div>
+      </div>
+    </header>
+
+    <div class="legend">深色代码条表示实际指令；<code>&lt;...&gt;</code> 为必填参数，<code>[...]</code> 为可选参数</div>
+
+    <section class="grid">
+      <article class="panel personal">
+        <div class="panel-head">
+          <span class="sigil">MY</span>
+          <h2>个人 <small>PERSONAL</small></h2>
+        </div>
+        <div class="item">
+          <div class="item-title">状态</div>
+          <div class="commands"><span class="cmd">/签到状态</span></div>
+        </div>
+        <div class="item">
+          <div class="item-title">成就</div>
+          <div class="commands"><span class="cmd">/签到成就</span></div>
+        </div>
+        <div class="item">
+          <div class="item-title">生日</div>
+          <div class="commands">
+            <span class="cmd">/签到生日 查看</span>
+            <span class="cmd">/签到生日 设置 &lt;MM-DD&gt;</span>
+            <span class="cmd">/签到生日 清除</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">称号</div>
+          <div class="commands">
+            <span class="cmd">/签到称号 查看</span>
+            <span class="cmd">/签到称号 佩戴 &lt;ID或名称&gt;</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel calendar">
+        <div class="panel-head">
+          <span class="sigil">CL</span>
+          <h2>日历与背景 <small>CALENDAR</small></h2>
+        </div>
+        <div class="item">
+          <div class="item-title">签到日历</div>
+          <div class="commands">
+            <span class="cmd">/签到日历 [YYYY-MM]</span>
+            <span class="note">默认当月；仅可查看当前及过去月份，无记录也照常出图</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">刷新背景</div>
+          <div class="commands">
+            <span class="cmd">/刷新背景</span>
+            <span class="note">花费金币重抽当天背景；需先完成今日签到，仅在线每日背景模式可用</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel ranking">
+        <div class="panel-head">
+          <span class="sigil">RK</span>
+          <h2>排行 <small>RANKING · 仅群聊</small></h2>
+        </div>
+        <div class="item">
+          <div class="item-title">今日</div>
+          <div class="commands">
+            <span class="cmd">/签到排行 今日</span>
+            <span class="note">按当天首次签到时间排序</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">月榜</div>
+          <div class="commands">
+            <span class="cmd">/签到排行 月榜</span>
+            <span class="note">按本月累计签到天数排序</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">连签</div>
+          <div class="commands">
+            <span class="cmd">/签到排行 连签</span>
+            <span class="note">按当前连续签到天数排序</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">累计</div>
+          <div class="commands">
+            <span class="cmd">/签到排行 累计</span>
+            <span class="note">按群内历史累计签到天数排序</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel store">
+        <div class="panel-head">
+          <span class="sigil">ST</span>
+          <h2>商店 <small>STORE</small></h2>
+        </div>
+        <div class="item">
+          <div class="item-title">查看商品</div>
+          <div class="commands"><span class="cmd">/签到商店 查看</span></div>
+        </div>
+        <div class="item">
+          <div class="item-title">加持</div>
+          <div class="commands"><span class="cmd">/签到商店 加持 &lt;1|3|7&gt;</span></div>
+        </div>
+      </article>
+
+      <article class="panel theme">
+        <div class="panel-head">
+          <span class="sigil">TH</span>
+          <h2>主题 <small>THEME</small></h2>
+        </div>
+        <div class="item">
+          <div class="item-title">签到主题</div>
+          <div class="commands">
+            <span class="cmd">/签到主题 列表</span>
+            <span class="cmd">/签到主题 查看 &lt;编号&gt;</span>
+            <span class="cmd">/签到主题 购买 &lt;编号&gt;</span>
+            <span class="cmd">/签到主题 切换 &lt;编号&gt;</span>
+            <span class="note">“查看”免费预览不扣金币；“购买”成功后自动切换</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel admin">
+        <div class="panel-head">
+          <span class="sigil">AD</span>
+          <h2>管理 <small>ADMIN</small></h2>
+          <span class="admin-badge">仅管理员</span>
+        </div>
+        <div class="item">
+          <div class="item-title">预览签到卡片</div>
+          <div class="commands">
+            <span class="cmd">/签到管理 预览</span>
+            <span class="note">生成真实效果预览，不写入签到数据</span>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-title">导出签到备份</div>
+          <div class="commands"><span class="cmd">/签到管理 导出</span></div>
+        </div>
+        <div class="item">
+          <div class="item-title">全局事件</div>
+          <div class="commands">
+            <span class="cmd">/签到管理 事件查看</span>
+            <span class="cmd long">/签到管理 事件添加 &lt;年度|单次&gt; &lt;日期&gt; &lt;名称&gt;</span>
+            <span class="cmd">/签到管理 事件删除 &lt;ID&gt;</span>
+            <span class="note">年度日期：MM-DD　单次日期：YYYY-MM-DD</span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      <div class="footer-head">
+        <h2>常用写法 / QUICK START</h2>
+        <span>实际前缀由 AstrBot 的 wake_prefix 配置决定</span>
+      </div>
+      <div class="quick-grid">
+        <div class="quick"><code>签到</code><span>无前缀纯文本签到</span></div>
+        <div class="quick"><code>/签到</code><span>使用命令前缀签到</span></div>
+        <div class="quick"><code>/签到帮助</code><span>发送本张签到指令图</span></div>
+        <div class="quick"><code>/p [标签] [数量]</code><span>搜索或随机发送图片</span></div>
+      </div>
+      <div class="prefix">图中斜杠为默认前缀示例；若管理员修改了 wake_prefix，请替换为实际前缀。</div>
+    </footer>
+  </main>
+</body>
+</html>

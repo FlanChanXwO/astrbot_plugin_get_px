@@ -283,7 +283,7 @@ def test_render_calendar_calls_html_render_with_fixed_jpeg_canvas() -> None:
     args = plugin.html_render.await_args
     assert args.kwargs["return_url"] is False
     assert args.kwargs["options"] == {
-        "full_page": False,
+        "full_page": True,
         "type": "jpeg",
         "quality": CHECKIN_JPEG_QUALITY,
         "clip": {"x": 0, "y": 0, "width": 1600, "height": 900},
