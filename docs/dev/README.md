@@ -6,6 +6,7 @@
 
 - [`setup.md`](./setup.md): 环境准备、常用目录、运行与调试入口
 - [`testing.md`](./testing.md): 语法检查、pytest 和回归建议
+- [`t2i-rendering.md`](./t2i-rendering.md): T2I 渲染链路、画布约定与本地重渲方法
 - [`contributing.md`](./contributing.md): 贡献流程、改动边界与提交流程
 - [`engineering-principles.md`](./engineering-principles.md): 工具使用、错误处理、保护逻辑与验证原则
 - [`maintenance.md`](./maintenance.md): 维护规则、配置边界与文档同步要求
