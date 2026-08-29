@@ -471,19 +471,19 @@ class CheckinCommandMixin:
             if action == "设置":
                 parsed = parse_month_day(value)
                 if parsed is None:
-                    return "用法: 签到我的 生日设置 MM-DD"
+                    return "用法: 签到生日 设置 MM-DD"
                 preference = await self.checkin_store.set_birthday(
                     user_id=user_id, month=parsed[0], day=parsed[1], source="manual"
                 )
                 return f"生日已设置为 {preference.birthday_label}（手动）"
             if action == "清除":
                 await self.checkin_store.clear_birthday(user_id)
-                return "生日已清除，再次使用“签到我的 生日查看”会重新读取 QQ 资料"
+                return "生日已清除，再次使用“签到生日 查看”会重新读取 QQ 资料"
             if action not in {"", "查看"}:
                 return (
-                    "用法: 签到我的 生日查看\n"
-                    "或: 签到我的 生日设置 MM-DD\n"
-                    "或: 签到我的 生日清除"
+                    "用法: 签到生日 查看\n"
+                    "或: 签到生日 设置 MM-DD\n"
+                    "或: 签到生日 清除"
                 )
             preference = await self.checkin_store.get_user_preference(user_id)
             if preference.birthday_label:
@@ -545,7 +545,7 @@ class CheckinCommandMixin:
             title = str(ACHIEVEMENTS[achievement_id]["title"])
             mark = "当前" if achievement_id == preference.selected_title_id else "可用"
             lines.append(f"[{mark}] {title}（{achievement_id}）")
-        lines.append("使用“签到我的 称号佩戴 <称号ID或名称>”切换")
+        lines.append("使用“签到称号 佩戴 <称号ID或名称>”切换")
         return "\n".join(lines)
 
     async def _handle_select_checkin_title(
@@ -554,7 +554,7 @@ class CheckinCommandMixin:
         if self.checkin_store is None:
             return "签到数据尚未初始化，请稍后再试"
         if not title:
-            return "用法: 签到我的 称号佩戴 <称号ID或名称>"
+            return "用法: 签到称号 佩戴 <称号ID或名称>"
         try:
             user_id = str(event.get_sender_id() or "")
             profile = await self.checkin_store.get_profile(user_id)

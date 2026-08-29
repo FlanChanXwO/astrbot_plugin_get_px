@@ -12,10 +12,15 @@
 签到指令：
     /签到                      每日签到
     /签到帮助                  查看所有签到指令
-    /签到我的                  个人签到资料
+    /签到状态                  查看金币、好感度和连续签到状态
+    /签到成就                  查看已解锁成就和下一目标
+    /签到生日                  生日查看/设置/清除
+    /签到称号                  称号查看与佩戴
     /签到排行                  查看签到排行
     /签到商店                  访问签到商店
+    /签到主题                  签到主题列表、查看、购买与切换
     /签到管理                  签到管理功能（仅管理员）
+    刷新背景                   花费金币重新抽取今天的签到背景
 """
 
 # 注意：不要在本模块使用 `from __future__ import annotations`。
@@ -357,26 +362,32 @@ class GetPxPlugin(
             [Image.fromFileSystem(str(CHECKIN_HELP_IMAGE))]
         )
 
-    @filter.command_group("签到我的")
-    def checkin_my(self):
-        """个人签到资料。"""
-
-    @checkin_my.command("状态")
+    @filter.command("签到状态")
     async def cmd_checkin_status(self, event: AstrMessageEvent):
         """查看金币、好感度和连续签到状态。"""
         event.stop_event()
         async for result in self._handle_checkin_status(event):
             yield result
 
-    @checkin_my.command("生日查看")
+    @filter.command("签到成就")
+    async def cmd_checkin_achievements(self, event: AstrMessageEvent):
+        """查看已解锁成就和下一目标。"""
+        event.stop_event()
+        yield event.plain_result(await self._handle_checkin_achievements(event))
+
+    @filter.command_group("签到生日")
+    def checkin_birthday(self):
+        """生日查看/设置/清除。"""
+
+    @checkin_birthday.command("查看")
     async def cmd_checkin_birthday_view(self, event: AstrMessageEvent):
-        """查看签到生日。"""
+        """查看生日；未保存时自动读取 QQ 资料。"""
         event.stop_event()
         yield event.plain_result(
             await self._handle_checkin_birthday(event, "查看", "")
         )
 
-    @checkin_my.command("生日设置")
+    @checkin_birthday.command("设置")
     async def cmd_checkin_birthday_set(
         self, event: AstrMessageEvent, value: str = ""
     ):
@@ -386,7 +397,7 @@ class GetPxPlugin(
             await self._handle_checkin_birthday(event, "设置", value)
         )
 
-    @checkin_my.command("生日清除")
+    @checkin_birthday.command("清除")
     async def cmd_checkin_birthday_clear(self, event: AstrMessageEvent):
         """清除签到生日。"""
         event.stop_event()
@@ -394,19 +405,17 @@ class GetPxPlugin(
             await self._handle_checkin_birthday(event, "清除", "")
         )
 
-    @checkin_my.command("成就")
-    async def cmd_checkin_achievements(self, event: AstrMessageEvent):
-        """查看签到成就。"""
-        event.stop_event()
-        yield event.plain_result(await self._handle_checkin_achievements(event))
+    @filter.command_group("签到称号")
+    def checkin_title(self):
+        """称号查看与佩戴。"""
 
-    @checkin_my.command("称号查看")
+    @checkin_title.command("查看")
     async def cmd_checkin_titles(self, event: AstrMessageEvent):
         """查看已解锁的签到称号。"""
         event.stop_event()
         yield event.plain_result(await self._handle_checkin_titles(event))
 
-    @checkin_my.command("称号佩戴")
+    @checkin_title.command("佩戴")
     async def cmd_select_checkin_title(self, event: AstrMessageEvent, title: str = ""):
         """佩戴已解锁的签到称号。"""
         event.stop_event()
@@ -469,31 +478,35 @@ class GetPxPlugin(
         async for result in self._handle_buy_checkin_boost(event, days):
             yield result
 
-    @checkin_shop.command("主题列表")
+    @filter.command_group("签到主题")
+    def checkin_theme(self):
+        """签到主题列表、查看、购买与切换。"""
+
+    @checkin_theme.command("列表")
     async def cmd_checkin_themes(self, event: AstrMessageEvent):
         """查看已购买和可购买的签到主题。"""
         event.stop_event()
         yield event.plain_result(await self._handle_checkin_themes(event))
 
-    @checkin_shop.command("主题查看")
+    @checkin_theme.command("查看")
     async def cmd_preview_checkin_theme(self, event: AstrMessageEvent, theme: str = ""):
         """查看指定签到主题的静态预览图。"""
         event.stop_event()
         yield await self._handle_checkin_theme_preview(event, theme)
 
-    @checkin_shop.command("主题购买")
+    @checkin_theme.command("购买")
     async def cmd_buy_checkin_theme(self, event: AstrMessageEvent, theme: str = ""):
         """购买签到主题，购买成功后自动切换。"""
         event.stop_event()
         yield event.plain_result(await self._handle_buy_checkin_theme(event, theme))
 
-    @checkin_shop.command("主题切换")
+    @checkin_theme.command("切换")
     async def cmd_select_checkin_theme(self, event: AstrMessageEvent, theme: str = ""):
         """切换到默认或已购买的签到主题。"""
         event.stop_event()
         yield event.plain_result(await self._handle_select_checkin_theme(event, theme))
 
-    @checkin_shop.command("刷新背景")
+    @filter.command("刷新背景")
     async def cmd_refresh_checkin_background(self, event: AstrMessageEvent):
         """花费金币重新抽取今天的签到背景。"""
         event.stop_event()

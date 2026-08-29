@@ -54,26 +54,25 @@ def test_checkin_commands_are_grouped_as_flat_command_groups() -> None:
     paths = _registered_command_paths()
 
     assert all(not path.startswith("/") for path in paths)
-    assert {"p", "签到", "签到帮助"} <= paths
+    assert {"p", "签到", "签到帮助", "刷新背景"} <= paths
     assert {
-        "签到我的 状态",
-        "签到我的 生日查看",
-        "签到我的 生日设置",
-        "签到我的 生日清除",
-        "签到我的 成就",
-        "签到我的 称号查看",
-        "签到我的 称号佩戴",
+        "签到状态",
+        "签到成就",
+        "签到生日 查看",
+        "签到生日 设置",
+        "签到生日 清除",
+        "签到称号 查看",
+        "签到称号 佩戴",
         "签到排行 今日",
         "签到排行 月榜",
         "签到排行 连签",
         "签到排行 累计",
         "签到商店 查看",
         "签到商店 加持",
-        "签到商店 刷新背景",
-        "签到商店 主题列表",
-        "签到商店 主题查看",
-        "签到商店 主题购买",
-        "签到商店 主题切换",
+        "签到主题 列表",
+        "签到主题 查看",
+        "签到主题 购买",
+        "签到主题 切换",
         "签到管理 预览",
         "签到管理 导出",
         "签到管理 事件查看",
@@ -81,26 +80,13 @@ def test_checkin_commands_are_grouped_as_flat_command_groups() -> None:
         "签到管理 事件删除",
     } <= paths
 
+    # 旧路径与旧组全部移除
     assert not {"签到中心"} & paths
-    assert not {
-        "签到状态",
-        "购买加持",
-        "签到主题",
-        "查看主题",
-        "购买主题",
-        "切换主题",
-        "刷新签到背景",
-        "签到生日",
-        "签到成就",
-        "签到称号",
-        "佩戴称号",
-        "签到测试",
-        "签到导出",
-        "签到事件",
-    } & paths
+    assert not {"签到我的 " + suffix for suffix in ("状态", "成就", "生日查看", "生日设置", "生日清除", "称号查看", "称号佩戴")} & paths
+    assert not {"签到商店 主题列表", "签到商店 主题查看", "签到商店 主题购买", "签到商店 主题切换", "签到商店 刷新背景"} & paths
 
 
-def test_checkin_command_groups_expose_four_sections() -> None:
+def test_checkin_command_groups_expose_focused_groups() -> None:
     group_names = {
         handler.handler_name
         for handler in _plugin_command_handlers()
@@ -110,11 +96,26 @@ def test_checkin_command_groups_expose_four_sections() -> None:
         )
     }
     assert {
-        "checkin_my",
+        "checkin_birthday",
+        "checkin_title",
         "checkin_ranking",
         "checkin_shop",
+        "checkin_theme",
         "checkin_admin",
     } <= group_names
+    assert "checkin_my" not in group_names
+
+
+def test_user_facing_prompt_strings_use_new_command_paths() -> None:
+    import inspect
+
+    import astrbot_plugin_get_px.checkin.commands as commands_mod
+    import astrbot_plugin_get_px.checkin.shop as shop_mod
+
+    stale = {"签到我的", "签到商店 主题", "签到商店 刷新背景"}
+    for mod in (commands_mod, shop_mod):
+        source = inspect.getsource(mod)
+        assert not any(token in source for token in stale), f"{mod.__name__} 含旧指令提示串"
 
 
 def test_checkin_center_has_no_legacy_root_registration() -> None:
