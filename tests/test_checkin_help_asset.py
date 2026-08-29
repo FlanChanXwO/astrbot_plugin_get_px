@@ -29,9 +29,12 @@ def test_help_template_inlines_font_and_new_commands(tmp_path):
     assert "签到我的" not in html  # 旧组不再出现在帮助图
 
 
-def test_help_png_is_1440x1800_rgb():
+def test_help_png_is_1440_wide_rgb_adaptive_height():
+    """宽度固定 1440；高度随指令内容自适应（full_page 渲染，无 clip）。"""
     from PIL import Image
 
     with Image.open(main.CHECKIN_HELP_IMAGE) as img:
-        assert img.size == (1440, 1800)
+        assert img.size[0] == 1440
         assert img.mode == "RGB"
+        # 当前内容约 1900+；超出该区间说明模板布局被意外改坏
+        assert 1600 <= img.size[1] <= 2400

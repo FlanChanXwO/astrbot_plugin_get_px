@@ -1,4 +1,8 @@
-"""Dev-only script: regenerate assets/checkin_help_v4.png via html_render."""
+"""Dev-only script: regenerate assets/checkin_help_v4.png via html_render.
+
+画布宽度固定 1440，高度随内容自适应（full_page 截图、不传 clip）；
+新增指令使内容变高时图片自动变高，不会再被固定尺寸裁切。
+"""
 
 from __future__ import annotations
 
@@ -26,8 +30,7 @@ async def _main() -> None:
         options={
             "full_page": True,
             "type": "png",
-            "clip": {"x": 0, "y": 0, "width": 1440, "height": 1800},
-            "viewport": {"width": 1440, "height": 1800},
+            "viewport": {"width": 1440, "height": 1200},
             "animations": "disabled",
         },
     )
