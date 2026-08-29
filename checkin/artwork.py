@@ -13,6 +13,7 @@ from astrbot.core.star.star_tools import StarTools
 
 from .models import CheckinRecord
 from .background import (
+    CHECKIN_ARTWORK_ASPECT_PARAM,
     CHECKIN_ARTWORK_TARGET_RATIO,
     CHECKIN_ARTWORK_TOLERANCE,
     filter_illusts_by_aspect_ratio,
@@ -613,7 +614,7 @@ class CheckinArtworkMixin:
                     selected_tag,
                     count=20,
                     offset=transient_offset if preview_nonce else 0,
-                    aspect_ratio="vertical",
+                    aspect_ratio=CHECKIN_ARTWORK_ASPECT_PARAM,
                     use_page_cursor=not preview_nonce,
                 )
             except Exception as e:

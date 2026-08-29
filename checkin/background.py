@@ -4,6 +4,14 @@ from __future__ import annotations
 CHECKIN_ARTWORK_TARGET_RATIO = 0.75
 CHECKIN_ARTWORK_TOLERANCE = 0.20
 
+# Lolicon aspectRatio 只接受数值条件组合（gt/gte/lt/lte/eq，如 "gt0.6lt0.9"）；
+# "vertical"/"landscape" 等枚举值不是合法语法，传了等于没筛。
+# 由目标比例和容差推导，保持与本地精筛同一数值口径。
+CHECKIN_ARTWORK_ASPECT_PARAM = (
+    f"gt{CHECKIN_ARTWORK_TARGET_RATIO * (1 - CHECKIN_ARTWORK_TOLERANCE):.2f}"
+    f"lt{CHECKIN_ARTWORK_TARGET_RATIO * (1 + CHECKIN_ARTWORK_TOLERANCE):.2f}"
+)
+
 
 def parse_aspect_ratio(value: object) -> float:
     raw = str(value or "").strip().lower()
