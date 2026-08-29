@@ -967,7 +967,7 @@ class MainErrorHandlingTest(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(user_sequence, ["user-a", "user-b"])
 
-    def test_flow_lock_is_keyed_by_user_only_across_days(self):
+    def test_flow_lock_is_keyed_by_user(self):
         plugin = object.__new__(GetPxPlugin)
         lock_user_a_first_call = plugin._checkin_flow_lock("10001")
         lock_user_a_second_call = plugin._checkin_flow_lock("10001")
