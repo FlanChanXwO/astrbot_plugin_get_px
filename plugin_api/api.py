@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 from pathlib import Path
 import tempfile
+import time
 from typing import Any
 
 from astrbot.api.all import logger
@@ -690,8 +691,11 @@ class PluginWebApi:
     def _clear_cache_storage_sync(self) -> dict[str, Any]:
         freed_bytes = 0
         deleted_files = 0
+        skipped_active = 0
+        # ponytail: 10 分钟内修改过的临时文件视为活跃下载，跳过避免中断进行中的 /p 请求
+        staleness_threshold = time.time() - 600
 
-        # Clear checkin card cache
+        # Clear checkin card cache (rendered JPEGs, never actively in use)
         checkin_cache = getattr(self.plugin, "checkin_cache", None)
         if checkin_cache and hasattr(checkin_cache, "root") and checkin_cache.root.exists():
             for p in list(checkin_cache.root.rglob("*")):
@@ -714,15 +718,18 @@ class PluginWebApi:
                     except OSError:
                         pass
 
-        # Clear temporary downloaded images
+        # Clear temporary downloaded images (skip files modified in last 10 min)
         tmp_dir = Path(tempfile.gettempdir())
         if tmp_dir.exists():
             for p in tmp_dir.glob("get_px_*"):
                 if p.is_file():
                     try:
-                        size = p.stat().st_size
+                        st = p.stat()
+                        if st.st_mtime > staleness_threshold:
+                            skipped_active += 1
+                            continue
                         p.unlink(missing_ok=True)
-                        freed_bytes += size
+                        freed_bytes += st.st_size
                         deleted_files += 1
                     except OSError as exc:
                         logger.debug(
@@ -733,6 +740,7 @@ class PluginWebApi:
         return {
             "freed_bytes": freed_bytes,
             "deleted_files": deleted_files,
+            "skipped_active": skipped_active,
             "freed_human": self._format_bytes(freed_bytes),
         }
 

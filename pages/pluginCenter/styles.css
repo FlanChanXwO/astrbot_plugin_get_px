@@ -805,6 +805,12 @@ h1 {
   border: 1px solid rgba(201, 47, 98, 0.2);
 }
 
+.badge-boost.pending {
+  color: #a85a08;
+  background: var(--warn-soft);
+  border: 1px solid rgba(168, 90, 8, 0.2);
+}
+
 .member-metric strong {
   margin-top: 2px;
   font: 700 15px/1.2 ui-monospace, monospace;

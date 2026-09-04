@@ -416,9 +416,12 @@ function renderMembers() {
     return;
   }
   els.memberList.innerHTML = state.members.map((member) => {
+    const remaining = Number(member.boost_remaining_days || 0);
     const boostBadge = member.boost_active
-      ? `<span class="badge-boost active" title="${escapeHtml(member.boost_status || '加持生效中')}">🔥 双倍好感·余${member.boost_remaining_days || 0}天</span>`
-      : `<span class="badge-boost">无加持</span>`;
+      ? `<span class="badge-boost active" title="${escapeHtml(member.boost_status || '加持生效中')}">🔥 双倍好感·余${remaining}天</span>`
+      : remaining > 0
+        ? `<span class="badge-boost pending" title="${escapeHtml(member.boost_status || '加持待生效')}">⏳ 待生效·余${remaining}天</span>`
+        : `<span class="badge-boost">无加持</span>`;
     return `
     <article class="member-row">
       <div class="member-identity">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import closing
+from datetime import date, timedelta
 import sqlite3
 import tempfile
 
@@ -9,10 +10,23 @@ import pytest
 from checkin import CheckinStore
 
 
+FIXED_DATE = "2026-05-26"
+
+
+class FrozenCheckinStore(CheckinStore):
+    """Pin today_key to a fixed date so boost assertions don't flak at midnight."""
+
+    def today_key(self) -> str:
+        return FIXED_DATE
+
+    def now_iso(self) -> str:
+        return f"{FIXED_DATE}T12:00:00+08:00"
+
+
 @pytest.mark.asyncio
 async def test_member_search_update_and_history_isolation() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        store = CheckinStore(tmp)
+        store = FrozenCheckinStore(tmp)
         alice = await store.checkin(
             user_id="10001",
             username="Alice",
@@ -146,7 +160,7 @@ async def test_member_update_rejects_invalid_values_and_unknown_users() -> None:
 @pytest.mark.asyncio
 async def test_member_boost_extend_active_and_unsigned_today() -> None:
     with tempfile.TemporaryDirectory() as tmp:
-        store = CheckinStore(tmp)
+        store = FrozenCheckinStore(tmp)
         # 未签到的用户：加持从今天起算，boost_active 为 True
         await store.get_profile("20001")
         first = await store.update_checkin_member(
@@ -172,7 +186,6 @@ async def test_member_boost_extend_active_and_unsigned_today() -> None:
             boost_action="add_1",
         )
         assert extended["member"]["boost_active"] is True
-        from datetime import date as _date, timedelta as _timedelta
-        prev = _date.fromisoformat(first_until)
-        expected = (prev + _timedelta(days=1)).isoformat()
+        prev = date.fromisoformat(first_until)
+        expected = (prev + timedelta(days=1)).isoformat()
         assert extended["member"]["boost_until_date"] == expected
