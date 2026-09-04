@@ -55,6 +55,7 @@ class LifecycleRuntime:
 
     plugin_manager: Any
     snapshot_state: Callable[[], RuntimeSnapshot]
+    snapshot_stars: Callable[[], tuple[object, ...]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +227,12 @@ def _build_official_runtime(
     config = AstrBotConfig(
         config_path=str(astrbot_root / "data" / "cmd_config.json"),
     )
+    get_all_stars = getattr(Context, "get_all_stars", None)
+    if not callable(get_all_stars):
+        raise LifecycleCheckError(
+            "runtime",
+            "当前 AstrBot 没有可观测的 get_all_stars() 公共接口",
+        )
     registered_web_apis = getattr(Context, "registered_web_apis", None)
     if not isinstance(registered_web_apis, list):
         raise LifecycleCheckError(
@@ -246,9 +253,13 @@ def _build_official_runtime(
             tasks=pending_tasks,
         )
 
+    def snapshot_stars() -> tuple[object, ...]:
+        return tuple(context.get_all_stars())
+
     return LifecycleRuntime(
         plugin_manager=manager,
         snapshot_state=snapshot_state,
+        snapshot_stars=snapshot_stars,
     )
 
 
@@ -260,6 +271,30 @@ def _added(before: Sequence[object], after: Sequence[object]) -> tuple[object, .
 def _retained(before: Sequence[object], after: Sequence[object]) -> tuple[object, ...]:
     after_ids = {id(item) for item in after}
     return tuple(item for item in before if id(item) in after_ids)
+
+
+def _resolve_loaded_plugin_name(
+    *,
+    baseline_stars: Sequence[object],
+    current_stars: Sequence[object],
+    plugin_dir_name: str,
+) -> str:
+    """从本轮新增的官方 StarMetadata 中取得管理 API 使用的注册名称。"""
+
+    names: list[str] = []
+    for metadata in _added(baseline_stars, current_stars):
+        name = getattr(metadata, "name", None)
+        if isinstance(name, str) and name.strip() and name not in names:
+            names.append(name)
+
+    if len(names) != 1:
+        registered_names = ", ".join(repr(name) for name in names) or "无"
+        raise LifecycleCheckError(
+            "load",
+            f"官方 load() 后无法从插件目录 {plugin_dir_name!r} 确定唯一的 "
+            f"StarMetadata.name；发现注册名称: {registered_names}",
+        )
+    return names[0]
 
 
 def _delta(before: RuntimeSnapshot, after: RuntimeSnapshot) -> RuntimeSnapshot:
@@ -389,6 +424,8 @@ async def run_lifecycle_check(
     load_succeeded = False
     uninstall_attempted = False
     residue_checked = False
+    baseline_stars: tuple[object, ...] | None = None
+    registered_plugin_name: str | None = None
     phase = "setup"
     previous_root = os.environ.get("ASTRBOT_ROOT")
     previous_reload = os.environ.get("ASTRBOT_RELOAD")
@@ -408,9 +445,10 @@ async def run_lifecycle_check(
 
         phase = "runtime"
         runtime = _build_official_runtime(root, plugin_name)
+        baseline_stars = runtime.snapshot_stars()
         baseline = runtime.snapshot_state()
 
-        # 官方 load() 负责实例化插件并调用其 initialize()。
+        # load() 使用 staging 目录名；后续公开管理 API 使用 StarMetadata.name。
         phase = "load"
         load = _require_public_manager_method(runtime.plugin_manager, "load", phase)
         _assert_manager_result(
@@ -419,6 +457,11 @@ async def run_lifecycle_check(
             await load(specified_dir_name=plugin_name),
         )
         load_succeeded = True
+        registered_plugin_name = _resolve_loaded_plugin_name(
+            baseline_stars=baseline_stars,
+            current_stars=runtime.snapshot_stars(),
+            plugin_dir_name=plugin_name,
+        )
         loaded_resources = _delta(baseline, runtime.snapshot_state())
 
         # 官方 reload() 负责 terminate → unbind → load，避免 harness 复制内部流程。
@@ -427,7 +470,7 @@ async def run_lifecycle_check(
         _assert_manager_result(
             phase,
             "reload",
-            await reload(specified_plugin_name=plugin_name),
+            await reload(specified_plugin_name=registered_plugin_name),
         )
         reloaded_resources = _delta(baseline, runtime.snapshot_state())
         _assert_reload_released(loaded_resources, reloaded_resources)
@@ -440,7 +483,7 @@ async def run_lifecycle_check(
             "uninstall_plugin",
             phase,
         )
-        await uninstall(plugin_name)
+        await uninstall(registered_plugin_name)
 
         await asyncio.sleep(0)
         phase = "resource cleanup"
@@ -463,7 +506,13 @@ async def run_lifecycle_check(
                     "cleanup uninstall",
                 )
                 uninstall_attempted = True
-                await uninstall(plugin_name)
+                if registered_plugin_name is None:
+                    raise LifecycleCheckError(
+                        "cleanup uninstall",
+                        "官方 load() 已成功，但无法确定 StarMetadata.name；"
+                        "拒绝使用插件目录名执行卸载。",
+                    )
+                await uninstall(registered_plugin_name)
             except _CATCHABLE_ERRORS as error:
                 cleanup_errors.append(("uninstall", error))
 
