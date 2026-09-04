@@ -26,7 +26,7 @@ python scripts/ci/check_plugin_quality_gate.py
 
 ## PR 生命周期 CI
 
-PR 生命周期 CI（`AstrBot Plugin Lifecycle`，`.github/workflows/plugin-lifecycle.yml`）不运行全量 pytest，也不承担基础静态检查；它只安装官方 AstrBot 和插件依赖，然后通过官方 `PluginManager` 验证插件的 `load → initialize → terminate → unbind` 生命周期，并检查本轮新增 handler、Web API 和后台任务是否全部清理。
+PR 生命周期 CI（`AstrBot Plugin Lifecycle`，`.github/workflows/plugin-lifecycle.yml`）不运行全量 pytest，也不承担基础静态检查；它只安装官方 AstrBot 和插件依赖，然后通过官方公开 `PluginManager.load()`、`reload()` 和 `uninstall_plugin()` 走完 `load → initialize → terminate → unbind` 路径。harness 只观察本轮新增的 handler、Web API 和后台任务并确认最终清理，不规定插件必须注册哪一类资源。
 
 本地等价生命周期检查需要先准备 AstrBot 源码目录：
 

@@ -22,6 +22,7 @@ try:
         normalize_safety_text,
         normalized_builtin_terms,
     )
+    from .web_api_compat import unregister_web_apis
 except ImportError:  # Direct imports used by the test suite.
     from checkin import load_checkin_snapshot_json
     from pixiv.downloader import cleanup, pick_image_url_exact
@@ -32,6 +33,7 @@ except ImportError:  # Direct imports used by the test suite.
         normalize_safety_text,
         normalized_builtin_terms,
     )
+    from plugin_api.web_api_compat import unregister_web_apis
 
 
 class PluginWebApi:
@@ -149,29 +151,14 @@ class PluginWebApi:
     def unregister(self) -> None:
         """移除本实例注册的 Web API 路由。
 
-        AstrBot 的官方插件解绑流程不会清理 ``Context.registered_web_apis``，
-        因此插件必须在 terminate 阶段主动移除自己注册的路由，避免热重载后残留。
+        AstrBot 当前没有公开的 ``unregister_web_api()``；唯一的 registry
+        兼容处理集中在 ``plugin_api.web_api_compat``，避免业务代码散落
+        AstrBot 内部存储格式假设。
         """
         if not self._registered_routes:
             return
 
-        owned_routes = tuple(self._registered_routes)
-        registered_web_apis = self.context.registered_web_apis
-
-        def is_owned(api: object) -> bool:
-            if not isinstance(api, tuple) or len(api) < 3:
-                return False
-            route, handler, methods = api[:3]
-            return any(
-                route == owned_route
-                and handler is owned_handler
-                and tuple(methods) == owned_methods
-                for owned_route, owned_handler, owned_methods in owned_routes
-            )
-
-        registered_web_apis[:] = [
-            api for api in registered_web_apis if not is_owned(api)
-        ]
+        unregister_web_apis(self.context, tuple(self._registered_routes))
         self._registered_routes.clear()
 
     def internal_error(self, action: str, exc: Exception):
