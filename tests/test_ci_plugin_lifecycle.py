@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +42,75 @@ def test_select_latest_stable_version_requires_a_formal_release() -> None:
         assert "stable" in str(exc).lower()
     else:
         raise AssertionError("没有正式版标签时应明确失败")
+
+
+def test_run_lifecycle_check_cleans_preexisting_empty_root(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_lifecycle_module()
+    astrbot_source = tmp_path / "astrbot"
+    astrbot_source.mkdir()
+    plugin_dir = tmp_path / "plugin"
+    plugin_dir.mkdir()
+    astrbot_root = tmp_path / "astrbot-root"
+    astrbot_root.mkdir()
+
+    metadata = SimpleNamespace(
+        star_cls=SimpleNamespace(initialize=lambda: None),
+        module_path="main.py",
+        root_dir_name="astrbot_plugin_get_px",
+        name="astrbot_plugin_get_px",
+        star_handler_full_names=("handler",),
+    )
+    handler = object()
+    web_api = ("/ci", object(), ("GET",))
+    snapshots = iter(
+        (
+            module.RuntimeSnapshot(),
+            module.RuntimeSnapshot(handlers=(handler,), web_apis=(web_api,)),
+            module.RuntimeSnapshot(),
+            module.RuntimeSnapshot(),
+        )
+    )
+
+    class FakePluginManager:
+        async def load(self, **_kwargs):
+            return True, None
+
+        async def _terminate_plugin(self, _metadata):
+            return None
+
+        async def _unbind_plugin(self, _plugin_name, _module_path):
+            return None
+
+    runtime = module.LifecycleRuntime(
+        context=object(),
+        plugin_manager=FakePluginManager(),
+        snapshot_state=lambda: next(snapshots),
+    )
+    monkeypatch.setattr(
+        module,
+        "_read_plugin_metadata",
+        lambda _plugin_dir, _plugin_name: ("v3.6.1", ">=4"),
+    )
+    monkeypatch.setattr(module, "_prepend_sys_path", lambda *_paths: [])
+    monkeypatch.setattr(
+        module, "_build_official_runtime", lambda *_args, **_kwargs: runtime
+    )
+    monkeypatch.setattr(module, "_find_metadata", lambda *_args: metadata)
+
+    asyncio.run(
+        module.run_lifecycle_check(
+            astrbot_source=astrbot_source,
+            astrbot_version="v4.27.5",
+            plugin_dir=plugin_dir,
+            astrbot_root=astrbot_root,
+            plugin_name="astrbot_plugin_get_px",
+        )
+    )
+
+    assert astrbot_root.is_dir()
+    assert not any(astrbot_root.iterdir())
 
 
 def test_lifecycle_workflow_matches_plugin_contract() -> None:

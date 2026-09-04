@@ -222,6 +222,16 @@ def _remove_sys_path(values: Sequence[str]) -> None:
             continue
 
 
+def _clear_directory_contents(directory: Path) -> None:
+    """清理检查写入的目录内容，但保留调用方预先创建的空目录。"""
+
+    for entry in directory.iterdir():
+        if entry.is_symlink() or not entry.is_dir():
+            entry.unlink()
+        else:
+            shutil.rmtree(entry)
+
+
 def _build_official_context(context_cls: type[Any], config: Any) -> Any:
     """按官方 Context 的真实签名注入最小依赖，不自定义替代 Context。"""
 
@@ -414,6 +424,12 @@ async def run_lifecycle_check(
         raise ValueError(f"AstrBot 源码目录不存在或不是目录: {source}")
 
     root_was_present = root.exists()
+    root_was_empty = (
+        root_was_present
+        and root.is_dir()
+        and not root.is_symlink()
+        and not any(root.iterdir())
+    )
     runtime: LifecycleRuntime | None = None
     metadata: Any | None = None
     staged_plugin: Path | None = None
@@ -595,9 +611,12 @@ async def run_lifecycle_check(
         else:
             os.environ["ASTRBOT_RELOAD"] = previous_reload
 
-        if not root_was_present and root.exists():
+        if root.exists() and (root_was_empty or not root_was_present):
             try:
-                shutil.rmtree(root)
+                if root_was_empty:
+                    _clear_directory_contents(root)
+                else:
+                    shutil.rmtree(root)
             except _CATCHABLE_ERRORS as error:
                 cleanup_errors.append(("temporary root cleanup", error))
 
