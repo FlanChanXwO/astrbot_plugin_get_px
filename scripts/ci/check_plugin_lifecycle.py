@@ -138,8 +138,8 @@ def stage_plugin(
     _validate_plugin_name(plugin_name)
     if not source.is_dir():
         raise ValueError(f"插件目录不存在或不是目录: {source}")
-    if root == source or root in source.parents:
-        raise ValueError("ASTRBOT_ROOT 不能位于插件源码目录内")
+    if root == source or root in source.parents or source in root.parents:
+        raise ValueError("ASTRBOT_ROOT 与插件源码目录不能互相包含")
     if root.is_symlink():
         raise ValueError(f"ASTRBOT_ROOT 不能是符号链接: {root}")
     if root.exists() and not root.is_dir():
