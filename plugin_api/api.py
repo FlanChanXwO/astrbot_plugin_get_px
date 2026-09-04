@@ -5,6 +5,7 @@ import base64
 from datetime import datetime
 import math
 from pathlib import Path
+import tempfile
 from typing import Any
 
 from astrbot.api.all import logger
@@ -124,6 +125,18 @@ class PluginWebApi:
             ),
             ("checkin-export", self.checkin_export, ["GET"], "Export check-in backup"),
             ("checkin-import", self.checkin_import, ["POST"], "Import check-in backup"),
+            (
+                "cache-storage",
+                self.cache_storage,
+                ["GET"],
+                "Get cache storage statistics",
+            ),
+            (
+                "cache-storage/clear",
+                self.cache_storage_clear,
+                ["POST"],
+                "Clear temporary cache storage",
+            ),
             ("config", self.config, ["GET"], "Get management center configuration"),
         )
         for path, handler, methods, description in routes:
@@ -245,6 +258,7 @@ class PluginWebApi:
         if payload is None:
             return jsonify({"success": False, "error": "请求内容必须是对象"}), 400
         user_id = str(payload.get("user_id") or "").strip()
+        boost_action = str(payload.get("boost_action") or "keep").strip()
         try:
             result = await self.plugin.checkin_store.update_checkin_member(
                 user_id=user_id,
@@ -256,6 +270,7 @@ class PluginWebApi:
                 streak_days=self._parse_profile_integer(
                     payload.get("streak_days"), "连续签到"
                 ),
+                boost_action=boost_action,
             )
             before = result["before"]
             member = result["member"]
@@ -264,7 +279,8 @@ class PluginWebApi:
                 f"coins={before['coins']}->{member['coins']} "
                 f"affection={before['affection']}->{member['affection']} "
                 f"total_days={before['total_days']}->{member['total_days']} "
-                f"streak_days={before['streak_days']}->{member['streak_days']}"
+                f"streak_days={before['streak_days']}->{member['streak_days']} "
+                f"boost_status={before.get('boost_status')}->{member.get('boost_status')}"
             )
             return jsonify({"success": True, "member": member})
         except LookupError as exc:
@@ -594,6 +610,131 @@ class PluginWebApi:
                 "font_url": font_urls.get(font_source, ""),
             }
         )
+
+    async def cache_storage(self):
+        try:
+            stats = await asyncio.to_thread(self._get_cache_storage_stats_sync)
+            return jsonify({"success": True, **stats})
+        except Exception as exc:
+            return self.internal_error("读取缓存统计", exc)
+
+    async def cache_storage_clear(self):
+        try:
+            result = await asyncio.to_thread(self._clear_cache_storage_sync)
+            logger.info(
+                f"{self.log_prefix} 管理页清理临时图片与卡片缓存: "
+                f"freed_bytes={result['freed_bytes']} deleted_files={result['deleted_files']}"
+            )
+            return jsonify({"success": True, **result})
+        except Exception as exc:
+            return self.internal_error("清理缓存数据", exc)
+
+    @staticmethod
+    def _format_bytes(size: int) -> str:
+        if size < 1024:
+            return f"{size} B"
+        if size < 1024 * 1024:
+            return f"{size / 1024:.1f} KB"
+        if size < 1024 * 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB"
+        return f"{size / (1024 * 1024 * 1024):.2f} GB"
+
+    def _get_cache_storage_stats_sync(self) -> dict[str, Any]:
+        card_bytes = 0
+        card_count = 0
+        temp_bytes = 0
+        temp_count = 0
+
+        # Check checkin card cache
+        checkin_cache = getattr(self.plugin, "checkin_cache", None)
+        if checkin_cache and hasattr(checkin_cache, "root") and checkin_cache.root.exists():
+            for p in checkin_cache.root.rglob("*"):
+                if p.is_file():
+                    try:
+                        card_bytes += p.stat().st_size
+                        card_count += 1
+                    except OSError as exc:
+                        logger.debug(
+                            f"{self.log_prefix} 缓存统计跳过文件: "
+                            f"path={p}, error_type={type(exc).__name__}"
+                        )
+
+        # Check temporary downloaded images (get_px_*)
+        tmp_dir = Path(tempfile.gettempdir())
+        if tmp_dir.exists():
+            for p in tmp_dir.glob("get_px_*"):
+                if p.is_file():
+                    try:
+                        temp_bytes += p.stat().st_size
+                        temp_count += 1
+                    except OSError as exc:
+                        logger.debug(
+                            f"{self.log_prefix} 临时文件统计跳过: "
+                            f"path={p}, error_type={type(exc).__name__}"
+                        )
+
+        total_bytes = card_bytes + temp_bytes
+        total_count = card_count + temp_count
+        return {
+            "card_cache_bytes": card_bytes,
+            "card_cache_count": card_count,
+            "card_cache_human": self._format_bytes(card_bytes),
+            "temp_download_bytes": temp_bytes,
+            "temp_download_count": temp_count,
+            "temp_download_human": self._format_bytes(temp_bytes),
+            "total_bytes": total_bytes,
+            "total_count": total_count,
+            "total_human": self._format_bytes(total_bytes),
+        }
+
+    def _clear_cache_storage_sync(self) -> dict[str, Any]:
+        freed_bytes = 0
+        deleted_files = 0
+
+        # Clear checkin card cache
+        checkin_cache = getattr(self.plugin, "checkin_cache", None)
+        if checkin_cache and hasattr(checkin_cache, "root") and checkin_cache.root.exists():
+            for p in list(checkin_cache.root.rglob("*")):
+                if p.is_file():
+                    try:
+                        size = p.stat().st_size
+                        p.unlink(missing_ok=True)
+                        freed_bytes += size
+                        deleted_files += 1
+                    except OSError as exc:
+                        logger.debug(
+                            f"{self.log_prefix} 清理卡片缓存跳过文件: "
+                            f"path={p}, error_type={type(exc).__name__}"
+                        )
+            # Remove empty subdirectories
+            for d in sorted(checkin_cache.root.glob("*"), reverse=True):
+                if d.is_dir():
+                    try:
+                        d.rmdir()
+                    except OSError:
+                        pass
+
+        # Clear temporary downloaded images
+        tmp_dir = Path(tempfile.gettempdir())
+        if tmp_dir.exists():
+            for p in tmp_dir.glob("get_px_*"):
+                if p.is_file():
+                    try:
+                        size = p.stat().st_size
+                        p.unlink(missing_ok=True)
+                        freed_bytes += size
+                        deleted_files += 1
+                    except OSError as exc:
+                        logger.debug(
+                            f"{self.log_prefix} 清理临时下载跳过文件: "
+                            f"path={p}, error_type={type(exc).__name__}"
+                        )
+
+        return {
+            "freed_bytes": freed_bytes,
+            "deleted_files": deleted_files,
+            "freed_human": self._format_bytes(freed_bytes),
+        }
 
     def _latest_backup_at(self) -> str:
         data_dir = getattr(self.plugin, "data_dir", None)

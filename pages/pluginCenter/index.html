@@ -216,6 +216,21 @@
               <button id="importBtn" class="danger" type="button" disabled>确认恢复此备份</button>
               <small id="importResult" aria-live="polite">尚未选择任何文件 (最大支持 5 MiB)</small>
             </section>
+
+            <!-- 缓存管理 -->
+            <section class="data-action cache-action">
+              <span class="action-index">STORAGE</span>
+              <h3>临时图片与卡片缓存</h3>
+              <p>包含已生成的签到卡片渲染缓存及 Pixiv 下载过程中的临时图片。清理缓存不会影响任何签到记录或用户数据。</p>
+              <div class="cache-stat-line">
+                <span id="cacheStorageText">正在统计缓存占用…</span>
+              </div>
+              <div class="cache-actions-row">
+                <button id="clearCacheBtn" class="danger" type="button">一键清理临时缓存</button>
+                <button id="refreshCacheBtn" type="button">刷新统计</button>
+              </div>
+              <small id="cacheStorageDetail" aria-live="polite">卡片缓存：- · 临时下载：-</small>
+            </section>
           </div>
         </section>
       </main>
@@ -256,6 +271,21 @@
           </label>
           <label for="memberStreakDays">连续签到
             <input id="memberStreakDays" name="streak_days" type="number" min="0" max="2147483647" step="1" inputmode="numeric" required />
+          </label>
+        </div>
+        <div class="member-boost-section">
+          <div class="member-boost-info">
+            <span class="boost-label">好感度加持状态</span>
+            <span id="memberBoostStatus" class="boost-badge">无加持</span>
+          </div>
+          <label for="memberBoostAction">调整加持
+            <select id="memberBoostAction" name="boost_action">
+              <option value="keep" selected>保持当前加持不变</option>
+              <option value="clear">清除加持（重置为无加持）</option>
+              <option value="add_1">延长 1 天双倍好感加持</option>
+              <option value="add_3">延长 3 天双倍好感加持</option>
+              <option value="add_7">延长 7 天双倍好感加持</option>
+            </select>
           </label>
         </div>
         <p class="member-history-note">这里只修改成员当前资料，不会篡改过去的签到奖励或排行榜记录。</p>

@@ -24,6 +24,7 @@ const state = {
     safety: false,
     blacklist: false,
     members: false,
+    cache: false,
   },
 };
 
@@ -57,6 +58,8 @@ const els = {
   memberAffection: $("memberAffection"),
   memberTotalDays: $("memberTotalDays"),
   memberStreakDays: $("memberStreakDays"),
+  memberBoostStatus: $("memberBoostStatus"),
+  memberBoostAction: $("memberBoostAction"),
   memberFormError: $("memberFormError"),
   builtinTerms: $("builtinTerms"),
   builtinCount: $("builtinCount"),
@@ -69,6 +72,10 @@ const els = {
   importFile: $("importFile"),
   importBtn: $("importBtn"),
   importResult: $("importResult"),
+  cacheStorageText: $("cacheStorageText"),
+  cacheStorageDetail: $("cacheStorageDetail"),
+  clearCacheBtn: $("clearCacheBtn"),
+  refreshCacheBtn: $("refreshCacheBtn"),
   toast: $("toast"),
   dialog: $("confirmDialog"),
   dialogTitle: $("dialogTitle"),
@@ -292,14 +299,18 @@ function renderGroups() {
     els.selectedGroupMeta.textContent = "GROUP SCOPE EMPTY";
     return;
   }
-  els.groupList.innerHTML = state.groups.map((group) => `
+  els.groupList.innerHTML = state.groups.map((group) => {
+    const groupName = group.group_name || group.group_id;
+    const groupMeta = `群号: ${group.group_id} (${group.platform})`;
+    return `
     <button class="group-button${group.group_id === state.selectedGroup ? " active" : ""}"
-      type="button" data-group="${escapeHtml(group.group_id)}">
-      <strong>${escapeHtml(group.group_name || group.group_id)}</strong>
-      <small>群号: ${escapeHtml(group.group_id)} (${escapeHtml(group.platform)})</small>
+      type="button" data-group="${escapeHtml(group.group_id)}" title="${escapeHtml(groupName)} - ${escapeHtml(groupMeta)}">
+      <strong title="${escapeHtml(groupName)}">${escapeHtml(groupName)}</strong>
+      <small title="${escapeHtml(groupMeta)}">${escapeHtml(groupMeta)}</small>
       <small>今日 ${formatCount(group.today_count)} · 本月 ${formatCount(group.month_count)}</small>
     </button>
-  `).join("");
+  `;
+  }).join("");
   els.groupList.querySelectorAll("[data-group]").forEach((button) => {
     button.addEventListener("click", async () => {
       state.selectedGroup = button.dataset.group || "";
@@ -404,11 +415,15 @@ function renderMembers() {
       : '<div class="empty">目前还没有签到成员资料</div>';
     return;
   }
-  els.memberList.innerHTML = state.members.map((member) => `
+  els.memberList.innerHTML = state.members.map((member) => {
+    const boostBadge = member.boost_active
+      ? `<span class="badge-boost active" title="${escapeHtml(member.boost_status || '加持生效中')}">🔥 双倍好感·余${member.boost_remaining_days || 0}天</span>`
+      : `<span class="badge-boost">无加持</span>`;
+    return `
     <article class="member-row">
       <div class="member-identity">
         <strong>${escapeHtml(member.username || member.user_id)}</strong>
-        <small>${escapeHtml(member.user_id)} · 最后签到 ${escapeHtml(member.last_checkin_date || "尚无记录")}</small>
+        <small>${escapeHtml(member.user_id)} · 最后签到 ${escapeHtml(member.last_checkin_date || "尚无记录")}${boostBadge}</small>
       </div>
       <div class="member-metric"><small>金币</small><strong>${formatCount(member.coins)}</strong></div>
       <div class="member-metric"><small>好感度</small><strong>${Number(member.affection || 0).toFixed(2)}</strong></div>
@@ -417,7 +432,8 @@ function renderMembers() {
       <button class="member-edit" type="button" data-edit-member="${escapeHtml(member.user_id)}"
         aria-label="编辑 ${escapeHtml(member.username || member.user_id)} 的签到数值">编辑</button>
     </article>
-  `).join("");
+  `;
+  }).join("");
   els.memberList.querySelectorAll("[data-edit-member]").forEach((button) => {
     button.addEventListener("click", () => {
       const member = state.members.find((item) => item.user_id === button.dataset.editMember);
@@ -469,6 +485,9 @@ function openMemberEditor(member, trigger) {
   els.memberAffection.value = Number(member.affection ?? 0).toFixed(2);
   els.memberTotalDays.value = String(member.total_days ?? 0);
   els.memberStreakDays.value = String(member.streak_days ?? 0);
+  els.memberBoostStatus.textContent = member.boost_status || "无加持";
+  els.memberBoostStatus.className = `boost-badge${member.boost_active ? " active" : ""}`;
+  els.memberBoostAction.value = "keep";
   els.memberFormError.textContent = "";
   els.memberDialog.showModal();
   els.memberCoins.focus();
@@ -482,6 +501,7 @@ function readMemberForm() {
     affection: Number(els.memberAffection.value),
     total_days: Number(els.memberTotalDays.value),
     streak_days: Number(els.memberStreakDays.value),
+    boost_action: els.memberBoostAction.value || "keep",
   };
   const integers = [
     ["金币", values.coins],
@@ -628,6 +648,35 @@ function renderData() {
     ? `最近备份：${formatDate(state.overview.latest_backup_at)}` : "最近备份：尚无备份记录";
 }
 
+async function loadCacheStorage() {
+  if (!els.cacheStorageText) return;
+  state.loaded.cache = true;
+  els.cacheStorageText.innerHTML = '<span class="muted">正在读取…</span>';
+  try {
+    const res = await apiGet("cache-storage");
+    els.cacheStorageText.innerHTML = `<strong>${escapeHtml(res.total_human || "0 B")}</strong> <small class="muted">(${formatCount(res.total_count || 0)} 个文件)</small>`;
+    els.cacheStorageDetail.textContent = `卡片缓存：${res.card_cache_human} (${formatCount(res.card_cache_count)}) · 临时下载：${res.temp_download_human} (${formatCount(res.temp_download_count)})`;
+  } catch (error) {
+    els.cacheStorageText.textContent = "读取失败";
+    els.cacheStorageDetail.textContent = error.message || "无法读取缓存统计";
+  }
+}
+
+async function clearCacheStorage() {
+  const confirmed = await confirmAction("清空临时缓存", "确定要清理已生成的卡片缓存和临时下载文件吗？这不会影响任何签到记录。");
+  if (!confirmed) return;
+  setButtonBusy(els.clearCacheBtn, true, "正在清理…", "一键清理临时缓存");
+  try {
+    const res = await apiPost("cache-storage/clear");
+    showToast(`缓存已清空，释放了 ${res.freed_human} (${formatCount(res.deleted_files)} 个文件)`);
+    await loadCacheStorage();
+  } catch (error) {
+    showToast(error.message || "清理缓存失败", "error");
+  } finally {
+    setButtonBusy(els.clearCacheBtn, false, "正在清理…", "一键清理临时缓存");
+  }
+}
+
 function backupFileError(file) {
   if (!file) return "请先选择备份文件。";
   if (!file.name.toLocaleLowerCase("zh-CN").endsWith(".json")) {
@@ -654,6 +703,9 @@ function switchView(name) {
     loadMembers({ reset: true }).catch((error) => {
       showGlobalError([errorMessage(error, "成员资料读取失败")]);
     });
+  }
+  if (name === "data" && !state.loaded.cache) {
+    loadCacheStorage();
   }
 }
 
@@ -850,6 +902,9 @@ function bindEvents() {
       els.importBtn.disabled = !els.importFile.files?.length;
     }
   });
+
+  els.clearCacheBtn?.addEventListener("click", clearCacheStorage);
+  els.refreshCacheBtn?.addEventListener("click", loadCacheStorage);
 }
 
 async function start() {

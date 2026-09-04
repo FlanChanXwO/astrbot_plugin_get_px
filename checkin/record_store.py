@@ -24,6 +24,8 @@ from .models import (
     CoinSpendResult,
 )
 from .rules import (
+    boost_remaining_days,
+    boost_status_text,
     daily_base_reward as _daily_base_reward,
     daily_note as _daily_note,
     is_boost_active,
@@ -143,12 +145,15 @@ class RecordStoreMixin:
         affection: float,
         total_days: int,
         streak_days: int,
+        boost_action: str = "keep",
     ) -> dict[str, dict[str, object]]:
         user_id = str(user_id or "").strip()
         if not user_id:
             raise ValueError("缺少用户 ID")
         if len(user_id) > 128:
             raise ValueError("用户 ID 不能超过 128 个字符")
+        if boost_action not in ("keep", "clear", "add_1", "add_3", "add_7"):
+            raise ValueError(f"不支持的加持操作: {boost_action}")
         integer_values = {
             "金币": coins,
             "累计签到": total_days,
@@ -179,6 +184,7 @@ class RecordStoreMixin:
                 round(affection, 2),
                 total_days,
                 streak_days,
+                boost_action,
                 self.now_iso(),
             )
 
@@ -518,6 +524,7 @@ class RecordStoreMixin:
         affection: float,
         total_days: int,
         streak_days: int,
+        boost_action: str,
         now: str,
     ) -> dict[str, dict[str, object]]:
         with closing(self._connect()) as conn:
@@ -528,14 +535,44 @@ class RecordStoreMixin:
                 ).fetchone()
                 if before_row is None:
                     raise LookupError("指定成员不存在")
+
+                before_profile = self._row_to_profile(before_row)
+                today_key = self.today_key()
+                today = date.fromisoformat(today_key)
+
+                boost_start = str(before_row["boost_start_date"] or "")
+                boost_until = str(before_row["boost_until_date"] or "")
+
+                if boost_action == "clear":
+                    boost_start = ""
+                    boost_until = ""
+                elif boost_action in ("add_1", "add_3", "add_7"):
+                    days = int(boost_action.split("_")[1])
+                    # 与用户购买路径保持一致：当天已签到则从明天起算，
+                    # 避免把加持浪费在没有待签到的一天上
+                    signed_today = before_profile.last_checkin_date == today_key
+                    requested_start = today + timedelta(days=1 if signed_today else 0)
+                    current_until = _parse_date(before_profile.boost_until_date)
+                    current_start = _parse_date(before_profile.boost_start_date)
+                    if current_until is not None and current_until >= requested_start:
+                        start_date = current_start or requested_start
+                        until_date = current_until + timedelta(days=days)
+                    else:
+                        start_date = requested_start
+                        until_date = requested_start + timedelta(days=days - 1)
+                    boost_start = start_date.isoformat()
+                    boost_until = until_date.isoformat()
+                elif boost_action != "keep":
+                    raise ValueError(f"不支持的加持操作: {boost_action}")
+
                 conn.execute(
                     """
                     UPDATE checkin_users
                     SET coins = ?, affection = ?, total_days = ?, streak_days = ?,
-                        updated_at = ?
+                        boost_start_date = ?, boost_until_date = ?, updated_at = ?
                     WHERE user_id = ?
                     """,
-                    (coins, affection, total_days, streak_days, now, user_id),
+                    (coins, affection, total_days, streak_days, boost_start, boost_until, now, user_id),
                 )
                 after_row = conn.execute(
                     f"{_MEMBER_SELECT} WHERE p.user_id = ?", (user_id,)
@@ -1110,8 +1147,9 @@ class RecordStoreMixin:
             updated_at=str(row["updated_at"] or ""),
         )
 
-    @staticmethod
-    def _row_to_member(row: sqlite3.Row) -> dict[str, object]:
+    def _row_to_member(self, row: sqlite3.Row) -> dict[str, object]:
+        profile = self._row_to_profile(row)
+        today = self.today_key()
         return {
             "user_id": str(row["user_id"]),
             "username": str(row["username"] or row["user_id"]),
@@ -1120,7 +1158,11 @@ class RecordStoreMixin:
             "total_days": int(row["total_days"] or 0),
             "streak_days": int(row["streak_days"] or 0),
             "last_checkin_date": str(row["last_checkin_date"] or ""),
+            "boost_start_date": str(row["boost_start_date"] or ""),
             "boost_until_date": str(row["boost_until_date"] or ""),
+            "boost_status": boost_status_text(profile, today),
+            "boost_active": is_boost_active(profile, today),
+            "boost_remaining_days": boost_remaining_days(profile, today),
             "updated_at": str(row["updated_at"] or ""),
         }
 
