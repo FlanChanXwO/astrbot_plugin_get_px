@@ -7,8 +7,8 @@ import sys
 from types import SimpleNamespace
 
 
-ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "scripts" / "ci" / "check_astrbot_plugin_lifecycle.py"
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "scripts" / "ci" / "check_plugin_lifecycle.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "plugin-lifecycle.yml"
 QUALITY_GATE_WORKFLOW = ROOT / ".github" / "workflows" / "plugin-quality-gate.yml"
 
@@ -114,6 +114,16 @@ def test_run_lifecycle_check_cleans_preexisting_empty_root(
     assert not any(astrbot_root.iterdir())
 
 
+def test_ci_directory_contains_only_lifecycle_check() -> None:
+    scripts = sorted(
+        path.name
+        for path in (ROOT / "scripts" / "ci").iterdir()
+        if path.is_file()
+    )
+
+    assert scripts == ["check_plugin_lifecycle.py"]
+
+
 def test_lifecycle_workflow_matches_plugin_contract() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
@@ -133,7 +143,7 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
     assert "python -m json.tool _conf_schema.json" not in workflow
     assert "node --check pages/pluginCenter/app.js" not in workflow
     assert "python -m pytest -v" not in workflow
-    assert "scripts/ci/check_astrbot_plugin_lifecycle.py" in workflow
+    assert "scripts/ci/check_plugin_lifecycle.py" in workflow
     assert "--plugin-name astrbot_plugin_get_px" in workflow
     assert "contents: write" not in workflow
 
@@ -153,7 +163,7 @@ def test_quality_gate_workflow_owns_repository_checks() -> None:
     assert "python -m json.tool _conf_schema.json" in workflow
     assert "node --check pages/pluginCenter/app.js" in workflow
     assert "python -m pytest -v" in workflow
-    assert "python scripts/ci/check_astrbot_plugin_lifecycle.py" not in workflow
+    assert "python scripts/ci/check_plugin_lifecycle.py" not in workflow
     assert "contents: write" not in workflow
 
 

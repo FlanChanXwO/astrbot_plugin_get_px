@@ -36,7 +36,7 @@ jobs:
           from pathlib import Path
           import sys
 
-          script = Path("scripts/ci/check_astrbot_plugin_lifecycle.py").resolve()
+          script = Path("scripts/ci/check_plugin_lifecycle.py").resolve()
           spec = spec_from_file_location("get_px_lifecycle", script)
           if spec is None or spec.loader is None:
               raise RuntimeError(f"无法加载 stable 版本解析器: {script}")
@@ -77,7 +77,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/check_astrbot_plugin_lifecycle.py \
+          python scripts/ci/check_plugin_lifecycle.py \
             --astrbot-source "$ASTRBOT_SOURCE" \
             --astrbot-version "$ASTRBOT_VERSION" \
             --plugin-dir "$GITHUB_WORKSPACE" \
