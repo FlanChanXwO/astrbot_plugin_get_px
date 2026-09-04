@@ -16,11 +16,11 @@
 
 ## PR 快速 CI
 
-PR 快速 CI（`.github/workflows/plugin-fast-ci.yml`）在 Ubuntu + Python 3.12 下安装最新正式版 AstrBot，执行 Python 编译检查、JSON schema 检查、前端 JavaScript 语法检查和全量 `python -m pytest -v`。
+PR 快速 CI（`AstrBot Plugin Quality Gate`，`.github/workflows/plugin-fast-ci.yml`）在 Ubuntu + Python 3.12 下安装最新正式版 AstrBot，执行 Python 编译检查、JSON schema 检查、前端 JavaScript 语法检查和全量 `python -m pytest -v`。
 
 ## PR 生命周期 CI
 
-PR 生命周期 CI（`.github/workflows/plugin-lifecycle.yml`）不运行全量 pytest，也不承担基础静态检查；它只安装官方 AstrBot 和插件依赖，然后通过官方 `PluginManager` 验证插件的 `load → initialize → terminate → unbind` 生命周期，并检查本轮新增 handler、Web API 和后台任务是否全部清理。
+PR 生命周期 CI（`AstrBot Plugin Lifecycle`，`.github/workflows/plugin-lifecycle.yml`）不运行全量 pytest，也不承担基础静态检查；它只安装官方 AstrBot 和插件依赖，然后通过官方 `PluginManager` 验证插件的 `load → initialize → terminate → unbind` 生命周期，并检查本轮新增 handler、Web API 和后台任务是否全部清理。
 
 本地等价生命周期检查需要先准备 AstrBot 源码目录：
 

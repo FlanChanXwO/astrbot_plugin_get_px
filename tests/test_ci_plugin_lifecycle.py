@@ -117,7 +117,8 @@ def test_run_lifecycle_check_cleans_preexisting_empty_root(
 def test_lifecycle_workflow_matches_plugin_contract() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
-    assert "name: AstrBot plugin lifecycle" in workflow
+    assert "name: AstrBot Plugin Lifecycle" in workflow
+    assert "name: AstrBot Plugin Lifecycle (latest stable)" in workflow
     assert "pull_request:" in workflow
     assert "permissions:\n  contents: read" in workflow
     assert "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" in workflow
@@ -138,7 +139,8 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
 def test_fast_pr_workflow_owns_repository_checks() -> None:
     workflow = FAST_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "name: AstrBot plugin fast checks" in workflow
+    assert "name: AstrBot Plugin Quality Gate" in workflow
+    assert "name: AstrBot Plugin Quality Gate (latest stable)" in workflow
     assert "pull_request:" in workflow
     assert "permissions:\n  contents: read" in workflow
     assert "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" in workflow
