@@ -7,7 +7,7 @@ import sys
 from types import SimpleNamespace
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "ci" / "check_astrbot_plugin_lifecycle.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "plugin-lifecycle.yml"
 QUALITY_GATE_WORKFLOW = ROOT / ".github" / "workflows" / "plugin-quality-gate.yml"
@@ -28,9 +28,9 @@ def test_select_latest_stable_version_ignores_prereleases() -> None:
 
     assert (
         module.select_latest_stable_version(
-            ["v4.27.5", "v4.28.0-beta.1", "v4.27.4", "4.2.0"]
+            ["v1.2.3", "v1.3.0-beta.1", "v1.2.2", "1.0.0"]
         )
-        == "v4.27.5"
+        == "v1.2.3"
     )
 
 
@@ -38,7 +38,7 @@ def test_select_latest_stable_version_requires_a_formal_release() -> None:
     module = _load_lifecycle_module()
 
     try:
-        module.select_latest_stable_version(["v4.28.0-beta.1", "nightly"])
+        module.select_latest_stable_version(["v1.3.0-rc.1", "nightly"])
     except ValueError as exc:
         assert "stable" in str(exc).lower()
     else:
@@ -103,7 +103,7 @@ def test_run_lifecycle_check_cleans_preexisting_empty_root(
     asyncio.run(
         module.run_lifecycle_check(
             astrbot_source=astrbot_source,
-            astrbot_version="v4.27.5",
+            astrbot_version="test-ref",
             plugin_dir=plugin_dir,
             astrbot_root=astrbot_root,
             plugin_name="astrbot_plugin_get_px",
@@ -125,8 +125,10 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
     assert "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065" in workflow
     assert 'python-version: "3.12"' in workflow
     assert "ASTRBOT_REPOSITORY: https://github.com/AstrBotDevs/AstrBot.git" in workflow
+    assert "ASTRBOT_VERSION: ${{ steps.astrbot-ref.outputs.ref }}" in workflow
+    assert "--astrbot-version v" not in workflow
     assert (
-        "python -m compileall -q main.py checkin pixiv plugin_api tests" not in workflow
+        "python -m compileall -q main.py checkin pixiv plugin_api scripts/ci tests" not in workflow
     )
     assert "python -m json.tool _conf_schema.json" not in workflow
     assert "node --check pages/pluginCenter/app.js" not in workflow
@@ -147,9 +149,16 @@ def test_quality_gate_workflow_owns_repository_checks() -> None:
     assert "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065" in workflow
     assert 'python-version: "3.12"' in workflow
     assert "ASTRBOT_REPOSITORY: https://github.com/AstrBotDevs/AstrBot.git" in workflow
-    assert "python -m compileall -q main.py checkin pixiv plugin_api tests" in workflow
+    assert "python -m compileall -q main.py checkin pixiv plugin_api scripts/ci tests" in workflow
     assert "python -m json.tool _conf_schema.json" in workflow
     assert "node --check pages/pluginCenter/app.js" in workflow
     assert "python -m pytest -v" in workflow
     assert "python scripts/ci/check_astrbot_plugin_lifecycle.py" not in workflow
     assert "contents: write" not in workflow
+
+
+def test_local_lifecycle_docs_resolve_the_checked_out_astrbot_ref() -> None:
+    docs = (ROOT / "docs" / "dev" / "testing.md").read_text(encoding="utf-8")
+
+    assert "--astrbot-version v" not in docs
+    assert 'git -C "$ASTRBOT_SOURCE" describe --tags --always' in docs

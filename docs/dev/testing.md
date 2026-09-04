@@ -4,7 +4,7 @@
 
 | 场景 | 工作目录 | 命令 |
 | --- | --- | --- |
-| Python 语法检查 | 插件目录 | `python -m compileall -q main.py checkin pixiv plugin_api tests` |
+| Python 语法检查 | 插件目录 | `python -m compileall -q main.py checkin pixiv plugin_api scripts/ci tests` |
 | JSON schema 检查 | 插件目录 | `python -m json.tool _conf_schema.json` |
 | JavaScript 语法检查 | 插件目录 | `node --check pages/pluginCenter/app.js` |
 | pytest 全部测试 | 插件目录 | `python -m pytest -v` |
@@ -25,9 +25,11 @@ PR 生命周期 CI（`AstrBot Plugin Lifecycle`，`.github/workflows/plugin-life
 本地等价生命周期检查需要先准备 AstrBot 源码目录：
 
 ```bash
+ASTRBOT_SOURCE="/path/to/AstrBot"
+ASTRBOT_VERSION="$(git -C "$ASTRBOT_SOURCE" describe --tags --always)"
 python scripts/ci/check_astrbot_plugin_lifecycle.py \
-  --astrbot-source /path/to/AstrBot \
-  --astrbot-version v4.27.5 \
+  --astrbot-source "$ASTRBOT_SOURCE" \
+  --astrbot-version "$ASTRBOT_VERSION" \
   --plugin-dir . \
   --astrbot-root /tmp/get-px-astrbot-root \
   --plugin-name astrbot_plugin_get_px
@@ -134,7 +136,7 @@ node --check pages/pluginCenter/app.js
 
 ```bash
 # 1. 语法检查
-python -m compileall -q main.py checkin pixiv plugin_api tests
+python -m compileall -q main.py checkin pixiv plugin_api scripts/ci tests
 python -m json.tool _conf_schema.json > /dev/null
 node --check pages/pluginCenter/app.js
 
