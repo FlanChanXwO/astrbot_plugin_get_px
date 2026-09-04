@@ -64,13 +64,13 @@ from .plugin_api import PluginWebApi
 
 LOG_PREFIX = "[GetPx]"
 PLUGIN_NAME = "astrbot_plugin_get_px"
-PLUGIN_VERSION = "v3.6.0"
+PLUGIN_VERSION = "v3.6.1"
 WEB_INTERNAL_ERROR_MESSAGE = "服务内部错误，请稍后重试"
 
 AUTO_TRIGGER_PATTERN = r"^/?(来\s*(.*?)(份|个|张|点))(.*?)(福利|色|瑟|涩|塞)?图$"
 CHECKIN_REGEX_PATTERN = r"^(?!/)签到$"
 CHECKIN_HELP_IMAGE = (
-    Path(__file__).resolve().parent / "assets" / "checkin_help_v4.png"
+    Path(__file__).resolve().parent / "assets" / "checkin_help_v4.1.png"
 )
 
 

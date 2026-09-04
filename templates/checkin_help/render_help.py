@@ -1,4 +1,4 @@
-"""Dev-only script: regenerate assets/checkin_help_v4.png via html_render.
+"""Dev-only script: regenerate assets/checkin_help_v4.1.png via html_render.
 
 画布宽度固定 1440，高度随内容自适应（full_page 截图、不传 clip）；
 新增指令使内容变高时图片自动变高，不会再被固定尺寸裁切。
@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from .help_template import _help_template  # noqa: E402
 
-OUT = Path(__file__).resolve().parents[2] / "assets" / "checkin_help_v4.png"
+OUT = Path(__file__).resolve().parents[2] / "assets" / "checkin_help_v4.1.png"
 
 
 async def _main() -> None:

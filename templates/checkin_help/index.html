@@ -14,7 +14,7 @@
         <h1>签到指令</h1>
       </div>
       <div class="header-right">
-        <div class="version">VER v3.6.0</div>
+        <div class="version">VER v3.6.1</div>
         <div class="subtitle">可直接输入的完整指令一览</div>
       </div>
     </header>
@@ -41,6 +41,7 @@
             <span class="cmd">/签到生日 查看</span>
             <span class="cmd">/签到生日 设置 &lt;MM-DD&gt;</span>
             <span class="cmd">/签到生日 清除</span>
+            <span class="note">签到当天为生日时卡片显示生日标签；未手动设置时自动从 QQ 资料获取</span>
           </div>
         </div>
         <div class="item">
@@ -48,6 +49,7 @@
           <div class="commands">
             <span class="cmd">/签到称号 查看</span>
             <span class="cmd">/签到称号 佩戴 &lt;ID或名称&gt;</span>
+            <span class="note">通过签到成就解锁称号，佩戴后显示在签到卡片上</span>
           </div>
         </div>
       </article>
@@ -115,11 +117,17 @@
         </div>
         <div class="item">
           <div class="item-title">查看商品</div>
-          <div class="commands"><span class="cmd">/签到商店 查看</span></div>
+          <div class="commands">
+            <span class="cmd">/签到商店 查看</span>
+            <span class="note">查看当前可购买的道具与价格</span>
+          </div>
         </div>
         <div class="item">
           <div class="item-title">加持</div>
-          <div class="commands"><span class="cmd">/签到商店 加持 &lt;1|3|7&gt;</span></div>
+          <div class="commands">
+            <span class="cmd">/签到商店 加持 &lt;1|3|7&gt;</span>
+            <span class="note">花费金币购买好感度双倍加持，持续指定天数；当天已签到则从次日起算</span>
+          </div>
         </div>
       </article>
 
