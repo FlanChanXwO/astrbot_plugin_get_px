@@ -14,6 +14,21 @@
 > [!TIP]
 > 这些是测试与检查命令，不是插件的独立运行命令。实际集成验证入口见 [`setup.md`](./setup.md#本地集成验证)。
 
+## PR 生命周期 CI
+
+PR 会在 Ubuntu + Python 3.12 下安装最新正式版 AstrBot，执行基础语法检查、配置 schema 检查、前端语法检查和 `pytest -v`，再通过官方 `PluginManager` 验证插件的加载、初始化、`terminate`、解绑，以及新增 handler、Web API 和后台任务的清理。
+
+本地等价生命周期检查需要先准备 AstrBot 源码目录：
+
+```bash
+python scripts/ci/check_astrbot_plugin_lifecycle.py \
+  --astrbot-source /path/to/AstrBot \
+  --astrbot-version v4.27.5 \
+  --plugin-dir . \
+  --astrbot-root /tmp/get-px-astrbot-root \
+  --plugin-name astrbot_plugin_get_px
+```
+
 ## 分层验证矩阵
 
 | 改动类型 | 最小检查 | 建议额外回归 | 关注点 |

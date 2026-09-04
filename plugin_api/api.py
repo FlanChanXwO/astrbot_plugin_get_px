@@ -49,6 +49,7 @@ class PluginWebApi:
         self.plugin_name = plugin_name
         self.log_prefix = log_prefix
         self.internal_error_message = internal_error_message
+        self._registered_routes: list[tuple[str, object, tuple[str, ...]]] = []
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.plugin, name)
@@ -141,9 +142,37 @@ class PluginWebApi:
             ("config", self.config, ["GET"], "Get management center configuration"),
         )
         for path, handler, methods, description in routes:
-            self.context.register_web_api(
-                f"/{self.plugin_name}/{path}", handler, methods, description
+            route = f"/{self.plugin_name}/{path}"
+            self.context.register_web_api(route, handler, methods, description)
+            self._registered_routes.append((route, handler, tuple(methods)))
+
+    def unregister(self) -> None:
+        """移除本实例注册的 Web API 路由。
+
+        AstrBot 的官方插件解绑流程不会清理 ``Context.registered_web_apis``，
+        因此插件必须在 terminate 阶段主动移除自己注册的路由，避免热重载后残留。
+        """
+        if not self._registered_routes:
+            return
+
+        owned_routes = tuple(self._registered_routes)
+        registered_web_apis = self.context.registered_web_apis
+
+        def is_owned(api: object) -> bool:
+            if not isinstance(api, tuple) or len(api) < 3:
+                return False
+            route, handler, methods = api[:3]
+            return any(
+                route == owned_route
+                and handler is owned_handler
+                and tuple(methods) == owned_methods
+                for owned_route, owned_handler, owned_methods in owned_routes
             )
+
+        registered_web_apis[:] = [
+            api for api in registered_web_apis if not is_owned(api)
+        ]
+        self._registered_routes.clear()
 
     def internal_error(self, action: str, exc: Exception):
         logger.error(
