@@ -7,16 +7,20 @@
 | Python 语法检查 | 插件目录 | `python -m compileall -q main.py checkin pixiv plugin_api tests` |
 | JSON schema 检查 | 插件目录 | `python -m json.tool _conf_schema.json` |
 | JavaScript 语法检查 | 插件目录 | `node --check pages/pluginCenter/app.js` |
-| pytest 全部测试 | 插件目录 | `pytest -v` |
-| pytest 快速测试 | 插件目录 | `pytest -q` |
-| pytest 特定模块 | 插件目录 | `pytest tests/test_checkin_*.py -v` |
+| pytest 全部测试 | 插件目录 | `python -m pytest -v` |
+| pytest 快速测试 | 插件目录 | `python -m pytest -q` |
+| pytest 特定模块 | 插件目录 | `python -m pytest tests/test_checkin_*.py -v` |
 
 > [!TIP]
 > 这些是测试与检查命令，不是插件的独立运行命令。实际集成验证入口见 [`setup.md`](./setup.md#本地集成验证)。
 
+## PR 快速 CI
+
+PR 快速 CI（`.github/workflows/plugin-fast-ci.yml`）在 Ubuntu + Python 3.12 下安装最新正式版 AstrBot，执行 Python 编译检查、JSON schema 检查、前端 JavaScript 语法检查和全量 `python -m pytest -v`。
+
 ## PR 生命周期 CI
 
-PR 会在 Ubuntu + Python 3.12 下安装最新正式版 AstrBot，执行基础语法检查、配置 schema 检查、前端语法检查和 `pytest -v`，再通过官方 `PluginManager` 验证插件的加载、初始化、`terminate`、解绑，以及新增 handler、Web API 和后台任务的清理。
+PR 生命周期 CI（`.github/workflows/plugin-lifecycle.yml`）不运行全量 pytest，也不承担基础静态检查；它只安装官方 AstrBot 和插件依赖，然后通过官方 `PluginManager` 验证插件的 `load → initialize → terminate → unbind` 生命周期，并检查本轮新增 handler、Web API 和后台任务是否全部清理。
 
 本地等价生命周期检查需要先准备 AstrBot 源码目录：
 
@@ -93,7 +97,7 @@ python scripts/ci/check_astrbot_plugin_lifecycle.py \
 ### 下载器改动
 
 ```bash
-pytest tests/test_downloader.py -v
+python -m pytest tests/test_downloader.py -v
 # 手工验证：实际下载一张图片
 # /来点图
 ```
@@ -101,7 +105,7 @@ pytest tests/test_downloader.py -v
 ### 签到改动
 
 ```bash
-pytest tests/test_checkin_*.py -v
+python -m pytest tests/test_checkin_*.py -v
 # 手工验证：
 # /签到
 # /签到日历
@@ -113,7 +117,7 @@ pytest tests/test_checkin_*.py -v
 
 ```bash
 python -m json.tool _conf_schema.json
-pytest tests/test_command_registration.py -v
+python -m pytest tests/test_command_registration.py -v
 # 手工验证：检查新配置是否生效
 ```
 
@@ -135,7 +139,7 @@ python -m json.tool _conf_schema.json > /dev/null
 node --check pages/pluginCenter/app.js
 
 # 2. 运行全部测试
-pytest -v
+python -m pytest -v
 
 # 3. 检查是否有遗漏的文档更新
 # 手工核对 README.md、docs/project/configuration.md 和 _conf_schema.json

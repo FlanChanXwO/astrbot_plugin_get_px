@@ -10,6 +10,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "ci" / "check_astrbot_plugin_lifecycle.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "plugin-lifecycle.yml"
+FAST_WORKFLOW = ROOT / ".github" / "workflows" / "plugin-fast-ci.yml"
 
 
 def _load_lifecycle_module():
@@ -123,11 +124,30 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
     assert "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065" in workflow
     assert 'python-version: "3.12"' in workflow
     assert "ASTRBOT_REPOSITORY: https://github.com/AstrBotDevs/AstrBot.git" in workflow
+    assert (
+        "python -m compileall -q main.py checkin pixiv plugin_api tests" not in workflow
+    )
+    assert "python -m json.tool _conf_schema.json" not in workflow
+    assert "node --check pages/pluginCenter/app.js" not in workflow
+    assert "python -m pytest -v" not in workflow
+    assert "scripts/ci/check_astrbot_plugin_lifecycle.py" in workflow
+    assert "--plugin-name astrbot_plugin_get_px" in workflow
+    assert "contents: write" not in workflow
+
+
+def test_fast_pr_workflow_owns_repository_checks() -> None:
+    workflow = FAST_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "name: AstrBot plugin fast checks" in workflow
+    assert "pull_request:" in workflow
+    assert "permissions:\n  contents: read" in workflow
+    assert "actions/checkout@11d5960a326750d5838078e36cf38b85af677262" in workflow
+    assert "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065" in workflow
+    assert 'python-version: "3.12"' in workflow
+    assert "ASTRBOT_REPOSITORY: https://github.com/AstrBotDevs/AstrBot.git" in workflow
     assert "python -m compileall -q main.py checkin pixiv plugin_api tests" in workflow
     assert "python -m json.tool _conf_schema.json" in workflow
     assert "node --check pages/pluginCenter/app.js" in workflow
     assert "python -m pytest -v" in workflow
-    assert "\n          pytest -v\n" not in workflow
-    assert "scripts/ci/check_astrbot_plugin_lifecycle.py" in workflow
-    assert "--plugin-name astrbot_plugin_get_px" in workflow
+    assert "python scripts/ci/check_astrbot_plugin_lifecycle.py" not in workflow
     assert "contents: write" not in workflow

@@ -1,4 +1,4 @@
-name: AstrBot plugin lifecycle
+name: AstrBot plugin fast checks
 
 on:
   pull_request:
@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  plugin-lifecycle:
-    name: AstrBot plugin lifecycle (latest stable)
+  plugin-fast-checks:
+    name: Plugin checks (latest stable AstrBot)
     runs-on: ubuntu-latest
     env:
       ASTRBOT_REPOSITORY: https://github.com/AstrBotDevs/AstrBot.git
@@ -60,7 +60,7 @@ jobs:
             --branch "${{ steps.astrbot-ref.outputs.ref }}" \
             "$ASTRBOT_REPOSITORY" "$ASTRBOT_SOURCE"
 
-      - name: Install official and plugin dependencies
+      - name: Install official and plugin/test dependencies
         env:
           ASTRBOT_SOURCE: ${{ runner.temp }}/astrbot
         shell: bash
@@ -68,18 +68,13 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check -e "$ASTRBOT_SOURCE"
           python -m pip install --disable-pip-version-check -r "$GITHUB_WORKSPACE/requirements.txt"
+          python -m pip install --disable-pip-version-check pytest pytest-asyncio
 
-      - name: Run official PluginManager lifecycle check
-        env:
-          ASTRBOT_SOURCE: ${{ runner.temp }}/astrbot
-          ASTRBOT_VERSION: ${{ steps.astrbot-ref.outputs.ref }}
-          ASTRBOT_ROOT: ${{ runner.temp }}/get-px-astrbot-root-latest-stable
+      - name: Run repository checks
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/ci/check_astrbot_plugin_lifecycle.py \
-            --astrbot-source "$ASTRBOT_SOURCE" \
-            --astrbot-version "$ASTRBOT_VERSION" \
-            --plugin-dir "$GITHUB_WORKSPACE" \
-            --astrbot-root "$ASTRBOT_ROOT" \
-            --plugin-name astrbot_plugin_get_px
+          python -m compileall -q main.py checkin pixiv plugin_api tests
+          python -m json.tool _conf_schema.json
+          node --check pages/pluginCenter/app.js
+          python -m pytest -v
