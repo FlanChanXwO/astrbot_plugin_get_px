@@ -10,7 +10,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "ci" / "check_astrbot_plugin_lifecycle.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "plugin-lifecycle.yml"
-FAST_WORKFLOW = ROOT / ".github" / "workflows" / "plugin-fast-ci.yml"
+QUALITY_GATE_WORKFLOW = ROOT / ".github" / "workflows" / "plugin-quality-gate.yml"
 
 
 def _load_lifecycle_module():
@@ -136,8 +136,8 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
     assert "contents: write" not in workflow
 
 
-def test_fast_pr_workflow_owns_repository_checks() -> None:
-    workflow = FAST_WORKFLOW.read_text(encoding="utf-8")
+def test_quality_gate_workflow_owns_repository_checks() -> None:
+    workflow = QUALITY_GATE_WORKFLOW.read_text(encoding="utf-8")
 
     assert "name: AstrBot Plugin Quality Gate" in workflow
     assert "name: AstrBot Plugin Quality Gate (latest stable)" in workflow
