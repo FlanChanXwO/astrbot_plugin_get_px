@@ -70,11 +70,8 @@ jobs:
           python -m pip install --disable-pip-version-check -r "$GITHUB_WORKSPACE/requirements.txt"
           python -m pip install --disable-pip-version-check pytest pytest-asyncio
 
-      - name: Run repository checks
+      - name: Run repository quality gate
         shell: bash
         run: |
           set -euo pipefail
-          python -m compileall -q main.py checkin pixiv plugin_api scripts/ci tests
-          python -m json.tool _conf_schema.json
-          node --check pages/pluginCenter/app.js
-          python -m pytest -v
+          python scripts/ci/check_plugin_quality_gate.py
