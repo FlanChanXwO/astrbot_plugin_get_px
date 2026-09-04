@@ -126,7 +126,8 @@ def test_lifecycle_workflow_matches_plugin_contract() -> None:
     assert "python -m compileall -q main.py checkin pixiv plugin_api tests" in workflow
     assert "python -m json.tool _conf_schema.json" in workflow
     assert "node --check pages/pluginCenter/app.js" in workflow
-    assert "pytest -v" in workflow
+    assert "python -m pytest -v" in workflow
+    assert "\n          pytest -v\n" not in workflow
     assert "scripts/ci/check_astrbot_plugin_lifecycle.py" in workflow
     assert "--plugin-name astrbot_plugin_get_px" in workflow
     assert "contents: write" not in workflow

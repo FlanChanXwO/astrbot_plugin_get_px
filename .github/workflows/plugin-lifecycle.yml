@@ -77,7 +77,7 @@ jobs:
           python -m compileall -q main.py checkin pixiv plugin_api tests
           python -m json.tool _conf_schema.json
           node --check pages/pluginCenter/app.js
-          pytest -v
+          python -m pytest -v
 
       - name: Run official PluginManager lifecycle check
         env:
